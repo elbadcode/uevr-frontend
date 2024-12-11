@@ -42,5 +42,14 @@ namespace UEVR {
             get { return (bool)this["FocusGameOnInjection"]; }
             set { this["FocusGameOnInjection"] = value; }
         }
+
+        //[UserScopedSettingAttribute ( )]
+        //[DefaultSettingValueAttribute ( "false" )]
+        //public bool m_LaunchModeButton
+        //{
+        //    get { return ( bool ) this [ "LaunchModeButton" ]; }
+        //    set { this [ "LaunchModeButton" ] = value; }
+        //}
+
     }
 }

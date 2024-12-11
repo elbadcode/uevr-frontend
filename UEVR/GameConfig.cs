@@ -124,7 +124,7 @@ namespace UEVR {
         private static void MoveDirectoryContents(string sourceDir, string destinationDir) {
             foreach (var dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories)) {
                 Directory.CreateDirectory(dirPath.Replace(sourceDir, destinationDir));
-            }
+            }   
 
             foreach (var newPath in Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories)) {
                 File.Copy(newPath, newPath.Replace(sourceDir, destinationDir), true);

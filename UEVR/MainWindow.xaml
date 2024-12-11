@@ -1,195 +1,379 @@
-﻿<Window x:Class="UEVR.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:UEVR"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        TextElement.FontWeight="Regular"
-        TextElement.FontSize="13"
-        TextOptions.TextFormattingMode="Ideal"
-        TextOptions.TextRenderingMode="Auto"
-        Background="#FF1A1B1C"
-        FontFamily="{DynamicResource MaterialDesignFont}"
-        mc:Ignorable="d"
-        Title="UEVR"
-        Closing="MainWindow_Closing" Loaded="MainWindow_Loaded"
-        SizeToContent="WidthAndHeight" ResizeMode="NoResize" Icon="/UEVR2.png"
-        WindowStartupLocation="CenterScreen"
-        WindowStyle="None"
-        >
+﻿<Window
+    x:Class="UEVR.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:UEVR"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="UEVR"
+    Background="#FF1A1B1C"
+    Closing="MainWindow_Closing"
+    FontFamily="{DynamicResource MaterialDesignFont}"
+    Icon="/UEVR2.png"
+    Loaded="MainWindow_Loaded"
+    ResizeMode="NoResize"
+    SizeToContent="WidthAndHeight"
+    TextElement.FontSize="13"
+    TextElement.FontWeight="Regular"
+    TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+    TextOptions.TextFormattingMode="Ideal"
+    TextOptions.TextRenderingMode="Auto"
+    WindowStartupLocation="CenterScreen"
+    WindowStyle="None"
+    mc:Ignorable="d">
     <StackPanel x:Name="m_vertStackPanel" Orientation="Vertical">
 
-        <Border MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#FF1A1B1C">
+        <Border Background="#FF1A1B1C" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
-                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Cursor" Value="Hand" />
                     <Style.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Cursor" Value="SizeAll"/>
+                            <Setter Property="Cursor" Value="SizeAll" />
                         </Trigger>
                     </Style.Triggers>
                 </Style>
             </Border.Style>
             <DockPanel Height="30">
-                <TextBlock Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}"
-                       VerticalAlignment="Center"
-                       Margin="25,0,0,0"
-                       FontWeight="Bold"
-                       Foreground="White" />
-                <Button DockPanel.Dock="Right"
-                    Click="CloseButton_Click"
+                <TextBlock
+                    Margin="25,0,0,0"
+                    VerticalAlignment="Center"
+                    FontWeight="Bold"
+                    Foreground="White"
+                    Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}" />
+                <Button
                     Width="30"
                     Height="30"
+                    HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderBrush="Transparent"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
-                >
-                    <materialDesign:PackIcon Kind="Close" HorizontalAlignment="Center" Height="30" Width="30" />
+                    Click="CloseButton_Click"
+                    DockPanel.Dock="Right"
+                    Style="{StaticResource MaterialDesignFloatingActionMiniButton}">
+                    <materialDesign:PackIcon
+                        Width="30"
+                        Height="30"
+                        HorizontalAlignment="Center"
+                        Kind="Close" />
                 </Button>
             </DockPanel>
         </Border>
         <StackPanel x:Name="m_sideStackPanel" Orientation="Horizontal">
             <DockPanel>
-                <Menu DockPanel.Dock="Top" HorizontalAlignment="Center">
+                <Menu HorizontalAlignment="Center" DockPanel.Dock="Top">
                     <Menu.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <VirtualizingStackPanel Orientation="Vertical"/>
+                            <VirtualizingStackPanel Orientation="Vertical" />
                         </ItemsPanelTemplate>
                     </Menu.ItemsPanel>
                     <MenuItem>
                         <MenuItem.Header>
                             <StackPanel Width="75">
-                                <materialDesign:PackIcon Kind="QuestionMark" HorizontalAlignment="Center" Height="30" Width="30">
-                                </materialDesign:PackIcon>
+                                <materialDesign:PackIcon
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="QuestionMark" />
                             </StackPanel>
                         </MenuItem.Header>
-                        <TextBlock TextWrapping="Wrap" Text="Author: praydog"/>
+                        <TextBlock Text="Author: praydog" TextWrapping="Wrap" />
 
-                        <MenuItem Header="_Documentation" Click="Documentation_Clicked">
-                        </MenuItem>
+                        <MenuItem Click="Documentation_Clicked" Header="_Documentation" />
 
-                        <MenuItem Header="_Donate" Click="Donate_Clicked">
-                        </MenuItem>
+                        <MenuItem Click="Donate_Clicked" Header="_Donate" />
                     </MenuItem>
                     <MenuItem x:Name="m_openGlobalDirectoryBtn" Click="OpenGlobalDir_Clicked">
                         <MenuItem.Header>
                             <StackPanel Width="75">
-                                <materialDesign:PackIcon Kind="Folder" HorizontalAlignment="Center" Height="30" Width="30">
-                                </materialDesign:PackIcon>
-                                <TextBlock Text="Open Global Dir" HorizontalAlignment="Center" FontSize="10"/>
+                                <materialDesign:PackIcon
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="Folder" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="10"
+                                    Text="Open Global Dir" />
                             </StackPanel>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Visibility="Collapsed" x:Name="m_openGameDirectoryBtn" Click="OpenGameDir_Clicked">
+                    <MenuItem x:Name="m_LaunchModeButton" Click="LaunchModeButton_Clicked">
                         <MenuItem.Header>
                             <StackPanel Width="75">
-                                <materialDesign:PackIcon Kind="Folder" HorizontalAlignment="Center" Height="30" Width="30">
-                                </materialDesign:PackIcon>
-                                <TextBlock Text="Open Game Dir" HorizontalAlignment="Center" FontSize="10"/>
-                            </StackPanel>
-                        </MenuItem.Header>
-                    </MenuItem>
-                    <MenuItem Visibility="Visible" x:Name="m_exportConfigBtn" Click="ExportConfig_Clicked">
-                        <MenuItem.Header>
-                            <StackPanel Width="75">
-                                <materialDesign:PackIcon Kind="Export"  HorizontalAlignment="Center" Height="30" Width="30" RenderTransformOrigin="0.5,0.5">
-                                    <materialDesign:PackIcon.RenderTransform>
+                                <materialDesign:PackIcon
+                                    x:Name="m_LaunchModeIcon"
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="Launch" />
+                                <TextBlock
+                                    x:Name="m_LaunchModeText"
+                                    HorizontalAlignment="Center"
+                                    FontSize="10"
+                                    RenderTransformOrigin="0.5,0.5"
+                                    Text="Launch Mode">
+                                    <TextBlock.RenderTransform>
                                         <TransformGroup>
-                                            <ScaleTransform/>
-                                            <SkewTransform/>
-                                            <RotateTransform Angle="180"/>
-                                            <TranslateTransform/>
+                                            <ScaleTransform />
+                                            <SkewTransform AngleX="-2.726" />
+                                            <RotateTransform />
+                                            <TranslateTransform X="0.286" />
                                         </TransformGroup>
-                                    </materialDesign:PackIcon.RenderTransform>
-                                </materialDesign:PackIcon>
-                                <TextBlock Text="Export Config" HorizontalAlignment="Center" FontSize="10"/>
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
                             </StackPanel>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Visibility="Visible" x:Name="m_importConfigBtn" Click="ImportConfig_Clicked">
+                    <MenuItem
+                        x:Name="m_openGameDirectoryBtn"
+                        Click="OpenGameDir_Clicked"
+                        Visibility="Collapsed">
                         <MenuItem.Header>
                             <StackPanel Width="75">
-                                <materialDesign:PackIcon Kind="Import"  HorizontalAlignment="Center" Height="30" Width="30" RenderTransformOrigin="0.5,0.5">
-                                </materialDesign:PackIcon>
-                                <TextBlock Text="Import Config" HorizontalAlignment="Center" FontSize="10"/>
+                                <materialDesign:PackIcon
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="Folder" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="10"
+                                    Text="Open Game Dir" />
+                            </StackPanel>
+                        </MenuItem.Header>
+                    </MenuItem>
+                    <MenuItem
+                        x:Name="m_exportConfigBtn"
+                        Click="ExportConfig_Clicked"
+                        Visibility="Visible">
+                        <MenuItem.Header>
+                            <StackPanel Width="75">
+                                <materialDesign:PackIcon
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="Export" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="10"
+                                    Text="Export Config" />
+                            </StackPanel>
+                        </MenuItem.Header>
+                    </MenuItem>
+                    <MenuItem
+                        x:Name="m_importConfigBtn"
+                        Click="ImportConfig_Clicked"
+                        Visibility="Visible">
+                        <MenuItem.Header>
+                            <StackPanel Width="75">
+                                <materialDesign:PackIcon
+                                    Width="30"
+                                    Height="30"
+                                    HorizontalAlignment="Center"
+                                    Kind="Import"
+                                    RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="10"
+                                    Text="Import Config" />
                             </StackPanel>
                         </MenuItem.Header>
                     </MenuItem>
                 </Menu>
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                    <TextBlock TextWrapping="Wrap" Text="Author: praydog"/>
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    DockPanel.Dock="Bottom"
+                    Orientation="Horizontal">
+                    <TextBlock Text="Author: praydog" TextWrapping="Wrap" />
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                    <Button Margin="5" Click="GitHub_Clicked" Background="Transparent" BorderThickness="0,0,0,0" RenderOptions.BitmapScalingMode="HighQuality" Height="40">
-                        <Image Source="github.png" HorizontalAlignment="Center" Height="30" Width="30" />
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    DockPanel.Dock="Bottom"
+                    Orientation="Vertical">
+                    <Button
+                        Height="40"
+                        Margin="5"
+                        Background="Transparent"
+                        BorderThickness="0,0,0,0"
+                        Click="GitHub_Clicked"
+                        RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image
+                            Width="30"
+                            Height="30"
+                            HorizontalAlignment="Center"
+                            Source="github.png" />
                     </Button>
-                    <Button Margin="5" Click="Donate_Clicked" Background="Transparent" BorderThickness="0,0,0,0" RenderOptions.BitmapScalingMode="HighQuality">
-                        <Image Source="donate.png" HorizontalAlignment="Center" Height="30" Width="30" />
+                    <Button
+                        Margin="5"
+                        Background="Transparent"
+                        BorderThickness="0,0,0,0"
+                        Click="Donate_Clicked"
+                        RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image
+                            Width="30"
+                            Height="30"
+                            HorizontalAlignment="Center"
+                            Source="donate.png" />
                     </Button>
-                    <Button Margin="5" Click="Discord_Clicked" Background="Transparent" BorderThickness="0,0,0,0" RenderOptions.BitmapScalingMode="HighQuality">
-                        <Image Source="discord.png" HorizontalAlignment="Center" Height="30" Width="30" />
+                    <Button
+                        Margin="5"
+                        Background="Transparent"
+                        BorderThickness="0,0,0,0"
+                        Click="Discord_Clicked"
+                        RenderOptions.BitmapScalingMode="HighQuality">
+                        <Image
+                            Width="30"
+                            Height="30"
+                            HorizontalAlignment="Center"
+                            Source="discord.png" />
                     </Button>
                 </StackPanel>
             </DockPanel>
             <StackPanel x:Name="m_topStackPanel" Orientation="Vertical">
-                <GroupBox x:Name="m_nNotificationsGroupBox" Header="Notifications" ClipToBounds="True" Visibility="Collapsed">
+                <GroupBox
+                    x:Name="m_nNotificationsGroupBox"
+                    ClipToBounds="True"
+                    Header="Notifications"
+                    Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock x:Name="m_adminExplanation" TextWrapping="Wrap" Text="Some executables may not show up or fail to inject unless started as Administrator." Visibility="Collapsed"/>
-                        <Button x:Name="m_restartAsAdminButton" Content="Restart as Administrator" Click="RestartAsAdminButton_Click" Visibility="Collapsed"/>
+                        <TextBlock
+                            x:Name="m_adminExplanation"
+                            Text="Some executables may not show up or fail to inject unless started as Administrator."
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                        <Button
+                            x:Name="m_restartAsAdminButton"
+                            Click="RestartAsAdminButton_Click"
+                            Content="Restart as Administrator"
+                            Visibility="Collapsed" />
                     </StackPanel>
                 </GroupBox>
                 <StackPanel Orientation="Horizontal">
-                    <GroupBox Header="Inject" ClipToBounds="True">
-                        <StackPanel ClipToBounds="True" HorizontalAlignment="Left">
-                            <ComboBox x:Name="m_processListBox" DropDownOpened="ComboBox_DropDownOpened" SelectionChanged="ComboBox_SelectionChanged" VerticalAlignment="Top" MinWidth="500"/>
-                            <Button x:Name="m_injectButton" Content="Inject" Click="Inject_Clicked"/>
+                    <GroupBox ClipToBounds="True" Header="Inject">
+                        <StackPanel HorizontalAlignment="Left" ClipToBounds="True">
+                            <Button
+                                x:Name="m_LaunchModeAppPicker"
+                                Click="AppPicker_Clicked"
+                                Content="Choose Application to Launch"
+                                Visibility="Collapsed" />
+                            <TextBox
+                                x:Name="m_LaunchTargetView"
+                                IsReadOnly="True"
+                                Text=""
+                                Visibility="Collapsed" />
+                            <ComboBox
+                                x:Name="m_processListBox"
+                                MinWidth="500"
+                                VerticalAlignment="Top"
+                                DropDownOpened="ComboBox_DropDownOpened"
+                                SelectionChanged="ComboBox_SelectionChanged" />
+                            <Button
+                                x:Name="m_LaunchButton"
+                                Click="Launch_Clicked"
+                                Content="Launch and Inject"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="m_injectButton"
+                                Click="Inject_Clicked"
+                                Content="Inject" />
                             <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="m_openvrRadio" Content="OpenVR"/>
-                                <RadioButton x:Name="m_openxrRadio" Content="OpenXR"/>
+                                <RadioButton x:Name="m_openvrRadio" Content="OpenVR" />
+                                <RadioButton x:Name="m_openxrRadio" Content="OpenXR" />
                                 <StackPanel Orientation="Horizontal">
-                                    <ToggleButton x:Name="m_nullifyVRPluginsCheckbox" HorizontalAlignment="Left"/>
-                                    <TextBlock TextWrapping="Wrap" Text="Nullify VR Plugins"/>
+                                    <ToggleButton x:Name="m_nullifyVRPluginsCheckbox" HorizontalAlignment="Left" />
+                                    <TextBlock Text="Nullify VR Plugins" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <ToggleButton x:Name="m_focusGameOnInjectionCheckbox" HorizontalAlignment="Left" IsChecked="True"/>
-                                    <TextBlock TextWrapping="Wrap" Text="Focus game on injection"/>
+                                    <ToggleButton
+                                        x:Name="m_focusGameOnInjectionCheckbox"
+                                        HorizontalAlignment="Left"
+                                        IsChecked="True" />
+                                    <TextBlock Text="Focus game on injection" TextWrapping="Wrap" />
                                 </StackPanel>
                             </StackPanel>
-                            <TextBlock x:Name="m_connectionStatus" TextWrapping="Wrap" Text="Unknown status"/>
+                            <TextBlock
+                                x:Name="m_connectionStatus"
+                                Height="41"
+                                Text="Unknown status"
+                                TextWrapping="Wrap" />
+                            <StackPanel
+                                x:Name="m_CmdLineGroup"
+                                Orientation="Vertical"
+                                Visibility="Collapsed">
+                                <TextBox
+                                    HorizontalAlignment="Left"
+                                    AllowDrop="False"
+                                    Focusable="False"
+                                    IsReadOnly="True"
+                                    Text="Enter Command Line:  " />
+                                <TextBox
+                                    x:Name="m_LaunchModeCmdLine"
+                                    Text=""
+                                    TextChanged="CommandLineText_Updated" />
+                                <TextBlock Text="" TextWrapping="Wrap" />
+                            </StackPanel>
                         </StackPanel>
+
                     </GroupBox>
                 </StackPanel>
-                <GroupBox Header="Game Settings" ClipToBounds="True">
-                    <ListView x:Name="m_iniListView" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" MaxHeight="640">
+                <GroupBox ClipToBounds="True" Header="Game Settings">
+                    <ListView
+                        x:Name="m_iniListView"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        MaxHeight="640">
                         <ListView.Resources>
                             <DataTemplate x:Key="ComboBoxTemplate">
-                                <ComboBox ToolTip="{Binding Tooltip}" ItemsSource="{Binding ComboValues}" SelectedValuePath="Key" DisplayMemberPath="Value" SelectedValue="{Binding Value}" SelectionChanged="ComboChanged_Value"/>
+                                <ComboBox
+                                    DisplayMemberPath="Value"
+                                    ItemsSource="{Binding ComboValues}"
+                                    SelectedValue="{Binding Value}"
+                                    SelectedValuePath="Key"
+                                    SelectionChanged="ComboChanged_Value"
+                                    ToolTip="{Binding Tooltip}" />
                             </DataTemplate>
                             <DataTemplate x:Key="TextBoxTemplate">
-                                <TextBox ToolTip="{Binding Tooltip}" Text="{Binding Value, Mode=TwoWay}" Width="150" TextChanged="TextChanged_Value"/>
+                                <TextBox
+                                    Width="150"
+                                    Text="{Binding Value, Mode=TwoWay}"
+                                    TextChanged="TextChanged_Value"
+                                    ToolTip="{Binding Tooltip}" />
                             </DataTemplate>
                             <DataTemplate x:Key="CheckBoxTemplate">
-                                <CheckBox ToolTip="{Binding Tooltip}" IsChecked="{Binding ValueAsBool,Mode=TwoWay}" Width="150" Checked="CheckChanged_Value" Unchecked="CheckChanged_Value"/>
+                                <CheckBox
+                                    Width="150"
+                                    Checked="CheckChanged_Value"
+                                    IsChecked="{Binding ValueAsBool, Mode=TwoWay}"
+                                    ToolTip="{Binding Tooltip}"
+                                    Unchecked="CheckChanged_Value" />
                             </DataTemplate>
 
                             <DataTemplate x:Key="KeyTemplate">
-                                <TextBlock ToolTip="{Binding Tooltip}" Text="{Binding Key}"/>
+                                <TextBlock Text="{Binding Key}" ToolTip="{Binding Tooltip}" />
                             </DataTemplate>
 
-                            <local:ValueTemplateSelector x:Key="valueTemplateSelector"
-                                     ComboBoxTemplate="{StaticResource ComboBoxTemplate}"
-                                     TextBoxTemplate="{StaticResource TextBoxTemplate}"
-                                     CheckboxTemplate="{StaticResource CheckBoxTemplate}"/>
+                            <local:ValueTemplateSelector
+                                x:Key="valueTemplateSelector"
+                                CheckboxTemplate="{StaticResource CheckBoxTemplate}"
+                                ComboBoxTemplate="{StaticResource ComboBoxTemplate}"
+                                TextBoxTemplate="{StaticResource TextBoxTemplate}" />
 
                         </ListView.Resources>
 
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Key" Width="200" CellTemplate="{StaticResource KeyTemplate}"/>
-                                <GridViewColumn Header="Value" Width="150" CellTemplateSelector="{StaticResource valueTemplateSelector}"/>
+                                <GridViewColumn
+                                    Width="200"
+                                    CellTemplate="{StaticResource KeyTemplate}"
+                                    Header="Key" />
+                                <GridViewColumn
+                                    Width="150"
+                                    CellTemplateSelector="{StaticResource valueTemplateSelector}"
+                                    Header="Value" />
                             </GridView>
                         </ListView.View>
                     </ListView>

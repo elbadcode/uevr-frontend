@@ -11,6 +11,45 @@ using System.Reflection;
 
 namespace UEVR {
     class Injector {
+
+        
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool CreateProcess(string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct STARTUPINFO
+    {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint ResumeThread(IntPtr hThread);
+
         [DllImport("kernel32.dll")]
         public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
@@ -34,6 +73,9 @@ namespace UEVR {
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool GetExitCodeThread(IntPtr hThread, out uint lpExitCode);
+
+        [DllImport ( "ntdll.dll" )]
+        public static extern uint RtlAdjustPrivilege ( uint Privilege, bool bEnablePrivilege, bool IsThreadPrivilege, out bool PreviousValue );
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
@@ -173,5 +215,7 @@ namespace UEVR {
 
             return true;
         }
+
+        
     }
 }

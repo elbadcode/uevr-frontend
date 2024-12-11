@@ -32,13 +32,16 @@ using static UEVR.SharedMemory;
 using System.Threading.Channels;
 using System.Security.Principal;
 using System.Windows.Media.Animation;
+using Microsoft.Win32;
+using Path = System.IO.Path;
+using System.Runtime.Serialization;
 
 namespace UEVR {
     class GameSettingEntry : INotifyPropertyChanged {
         private string _key = "";
         private string _value = "";
         private string _tooltip = "";
-
+     
         public string Key { get => _key; set => SetProperty(ref _key, value); }
         public string Value { 
             get => _value; 
@@ -57,6 +60,8 @@ namespace UEVR {
                 Value = value.ToString().ToLower();
             } 
         }
+
+    
 
         public Dictionary<string, string> ComboValues { get; set; } = new Dictionary<string, string>();
 
@@ -160,7 +165,7 @@ namespace UEVR {
 
         private string m_lastSelectedProcessName = new string("");
         private int m_lastSelectedProcessId = 0;
-
+        private string m_launchTarget = new string ( "" );
         private SharedMemory.Data? m_lastSharedData = null;
         private bool m_connected = false;
 
@@ -170,16 +175,34 @@ namespace UEVR {
 
         private IConfiguration? m_currentConfig = null;
         private string? m_currentConfigPath = null;
-
         private ExecutableFilter m_executableFilter = new ExecutableFilter();
         private string? m_commandLineAttachExe = null;
+
+        private string? m_commandLinePassThroughArgs = null;
         private bool m_ignoreFutureVDWarnings = false;
+
+        private string LaunchModeArgs = "";
+        public bool m_launchMode = true;
+        public bool m_startSuspended = true;
+
+        //TODO child injection
+        //in case a game can't be launched directly we can launch it through its normal means and constantly poll for a known child process
+        //or perhaps there's a better way to watch the child. We could also inject into the parent anyway and create a remote thread to have
+        //the parent handle injecting the child and then unload. In this mode we would need to also ensure we don't inject plugins until we verify the child
+        //probably best to write a new loader module to handle this. For now we can just poll for a name if its given otherwise we'll just inject into the parent
+        //most games should be fine to launch directly. Even games with launchers are usually fine, you just need to check the command line when launching from the official means
+        //  public string? m_injectChild = null;
+        //  public int m_launchInjectDelay = 0;
+
+        //TODO qol injection stuff
+        //   private List<string> m_delayedPlugins = new List<string> ( );
+        //  private int m_pluginDelay = 0;
+        //  private bool m_futureAutoLaunch = false;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
 
         private string excludedProcessesFile = "excluded.txt";
-
         public MainWindow() {
             InitializeComponent();
 
@@ -188,8 +211,16 @@ namespace UEVR {
 
             // Parse and handle arguments
             foreach (string arg in args) {
-                if (arg.StartsWith("--attach=")) {
+                if (arg.EndsWith(".exe")) {
                     m_commandLineAttachExe = arg.Split('=')[1];
+                    if (arg.StartsWith("--attach=")) {
+                        m_launchMode = false;
+                    }
+                    //allow directly setting launch mode from arg, leaving old behavior on --attach for other launchers to call
+                    else if (arg.StartsWith("--launch=")){
+                        m_launchMode = true;
+                        m_launchTarget= arg.Split ( '=' ) [ 1 ];
+                    }
                 }
             }
         }
@@ -206,7 +237,9 @@ namespace UEVR {
                 m_adminExplanation.Visibility = Visibility.Visible;
             }
 
-            FillProcessList();
+            if ( !m_launchMode) {
+                 FillProcessList();
+            }
             m_openvrRadio.IsChecked = m_mainWindowSettings.OpenVRRadio;
             m_openxrRadio.IsChecked = m_mainWindowSettings.OpenXRRadio;
             m_nullifyVRPluginsCheckbox.IsChecked = m_mainWindowSettings.NullifyVRPluginsCheckbox;
@@ -266,7 +299,7 @@ namespace UEVR {
 
             if (m_commandLineAttachExe == null) {
                 if (m_lastSelectedProcessId == 0) {
-                    m_injectButton.Content = "Inject";
+                    m_injectButton.Content = !m_launchMode ? "Inject" : "Launch and Inject";
                     return;
                 }
 
@@ -282,8 +315,8 @@ namespace UEVR {
                         }
                     }
 
-                    m_injectButton.Content = "Inject";
-                } catch (ArgumentException) {
+                    m_injectButton.Content = !m_launchMode ? "Inject" : "Launch and Inject";                }
+                catch (ArgumentException) {
                     var processes = Process.GetProcessesByName(m_lastSelectedProcessName);
 
                     if (processes == null || processes.Length == 0 || !AnyInjectableProcesses(processes)) {
@@ -291,7 +324,7 @@ namespace UEVR {
                         return;
                     }
 
-                    m_injectButton.Content = "Inject";
+                    m_injectButton.Content = !m_launchMode ? "Inject" : "Launch and Inject";
                 }
             } else {
                 m_injectButton.Content = "Waiting for " + m_commandLineAttachExe.ToLower() + "...";
@@ -310,6 +343,10 @@ namespace UEVR {
                         m_lastSelectedProcessName = p.ProcessName;
                         process = p;
                     }
+                    else
+                        {
+                            
+                        }
                 }
 
                 if (process == null) {
@@ -357,8 +394,9 @@ namespace UEVR {
                     }
 
                     m_lastAutoInjectTime = now;
-                    m_commandLineAttachExe = null; // no need anymore.
-                    FillProcessList();
+                    //m_commandLineAttachExe = null;
+                    if (!m_launchMode)
+                        FillProcessList();
                     if (m_focusGameOnInjectionCheckbox.IsChecked == true)
                     {
                         SwitchToThisWindow(process.MainWindowHandle, true);
@@ -398,13 +436,13 @@ namespace UEVR {
                     lastFrontendSignal = now;
                 }
             } else {
-                if (m_connected && !string.IsNullOrEmpty(m_commandLineAttachExe))
+                if (m_connected && !string.IsNullOrEmpty(m_commandLineAttachExe)) 
                 {
                     // If we launched with an attached game exe, we shut ourselves down once that game closes.
                     Application.Current.Shutdown();
                     return;
                 }
-                
+               
                 m_connectionStatus.Text = UEVRConnectionStatus.NoInstanceDetected;
                 m_connected = false;
                 Hide_ConnectionOptions();
@@ -567,8 +605,8 @@ namespace UEVR {
             }
         }
 
-        private bool m_virtualDesktopWarned = false;
-        private bool m_virtualDesktopChecked = false;
+        private bool m_virtualDesktopWarned = true;
+        private bool m_virtualDesktopChecked = true;
         private void Check_VirtualDesktop() {
             if (m_virtualDesktopWarned || m_ignoreFutureVDWarnings) {
                 return;
@@ -587,9 +625,24 @@ namespace UEVR {
             }
         }
 
+        private void Update_LaunchButton ( ) {
+            if ( m_connected ) {
+                m_injectButton.Content = "Terminate Connected Process";
+                return;
+            }
+            else {
+                if ( m_launchMode )
+                    m_injectButton.Content = "Launch and Inject";
+                else
+                    m_injectButton.Content = "Inject";
+            }
+        }
+
+
         private void MainWindow_Update() {
             Update_InjectorConnectionStatus();
             Update_InjectStatus();
+            Update_LaunchButton();
 
             if (m_virtualDesktopChecked == false) {
                 m_virtualDesktopChecked = true;
@@ -726,7 +779,7 @@ namespace UEVR {
                 var textBox = (TextBox)sender;
                 var keyValuePair = (GameSettingEntry)textBox.DataContext;
 
-                // For some reason the TextBox.text is updated but thne keyValuePair.Value isn't at this point.
+                // For some reason the TextBox.text is updated but the keyValuePair.Value isn't at this point.
                 bool changed = m_currentConfig[keyValuePair.Key] != textBox.Text || keyValuePair.Value != textBox.Text;
                 var newValue = textBox.Text;
 
@@ -866,11 +919,19 @@ namespace UEVR {
 
             m_currentConfig = builder.Build();
             m_currentConfigPath = configPath;
-
+            string cmdline = "";
+           foreach (var entry in m_currentConfig.AsEnumerable ( ).ToList ( )  )
+            {
+                if ( entry.Key == "Frontend_LauncherCommandLine" )
+                    cmdline = entry.Value;
+            }
+            if ( cmdline != "" ) m_commandLinePassThroughArgs = cmdline;
             foreach (var entry in MandatoryConfig.Entries) {
                 if (m_currentConfig.AsEnumerable().ToList().FindAll(v => v.Key == entry.Key).Count() == 0) {
                     m_currentConfig[entry.Key] = entry.Value;
                 }
+
+                
             }
 
             RefreshConfigUI();
@@ -885,77 +946,90 @@ namespace UEVR {
 
         private bool m_isFirstProcessFill = true;
 
-        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+        private void ComboBox_SelectionChanged ( object sender, SelectionChangedEventArgs e )
+            {
             //ComboBoxItem comboBoxItem = ((sender as ComboBox).SelectedItem as ComboBoxItem);
 
-            try {
-                var box = (sender as ComboBox);
-                if (box == null || box.SelectedIndex < 0 || box.SelectedIndex > m_processList.Count) {
-                    return;
-                }
+                try
+                    {
+                    var box = ( sender as ComboBox );
+                    if ( box == null || box.SelectedIndex < 0 || box.SelectedIndex > m_processList.Count )
+                        {
+                        return;
+                        }
 
-                var p = m_processList[box.SelectedIndex];
-                if (p == null || p.HasExited) {
-                    return;
-                }
-
-                m_lastSelectedProcessName = p.ProcessName;
-                m_lastSelectedProcessId = p.Id;
+                    var p = m_processList [ box.SelectedIndex ];
+                    if ( p == null || p.HasExited )
+                        {
+                        return;
+                        }
+                
 
                 // Search for the VR plugins inside the game directory
                 // and warn the user if they exist.
-                if (m_lastDisplayedWarningProcess != m_lastSelectedProcessName && p.MainModule != null) {
-                    m_lastDisplayedWarningProcess = m_lastSelectedProcessName;
+                if ( m_lastDisplayedWarningProcess != m_lastSelectedProcessName && p.MainModule != null )
+                        {
+                        m_lastDisplayedWarningProcess = m_lastSelectedProcessName;
 
-                    var gamePath = p.MainModule.FileName;
-                    
-                    if (gamePath != null) {
-                        var gameDirectory = System.IO.Path.GetDirectoryName(gamePath);
+                        var gamePath = p.MainModule.FileName;
 
-                        if (gameDirectory != null) {
-                            var pluginsDir = AreVRPluginsPresent(gameDirectory);
+                        if ( gamePath != null )
+                            {
+                            var gameDirectory = System.IO.Path.GetDirectoryName ( gamePath );
 
-                            if (pluginsDir != null) {
-                                MessageBox.Show("VR plugins have been detected in the game install directory.\n" +
-                                                "You may want to delete or rename these as they will cause issues with the mod.\n" +
-                                                "You may also want to pass -nohmd as a command-line option to the game. This can sometimes work without deleting anything.");
-                                var result = MessageBox.Show("Do you want to open the plugins directory now?", "Confirmation", MessageBoxButton.YesNo);
+                            if ( gameDirectory != null )
+                                {
+                                var pluginsDir = AreVRPluginsPresent ( gameDirectory );
 
-                                switch (result) {
-                                    case MessageBoxResult.Yes:
-                                        NavigateToDirectory(pluginsDir);
-                                        break;
-                                    case MessageBoxResult.No:
-                                        break;
-                                };
-                            }
+                                if ( pluginsDir != null )
+                                    {
+                                    MessageBox.Show ( "VR plugins have been detected in the game install directory.\n" +
+                                                    "You may want to delete or rename these as they will cause issues with the mod.\n" +
+                                                    "You may also want to pass -nohmd as a command-line option to the game. This can sometimes work without deleting anything." );
+                                    var result = MessageBox.Show ( "Do you want to open the plugins directory now?", "Confirmation", MessageBoxButton.YesNo );
 
-                            Check_VirtualDesktop();
+                                    switch ( result )
+                                        {
+                                        case MessageBoxResult.Yes:
+                                            NavigateToDirectory ( pluginsDir );
+                                            break;
+                                        case MessageBoxResult.No:
+                                            break;
+                                        };
+                                    }
 
-                            m_iniListView.ItemsSource = null; // Because we are switching processes.
-                            InitializeConfig(p.ProcessName);
+                                Check_VirtualDesktop ( );
 
-                            if (!IsUnrealEngineGame(gameDirectory, m_lastSelectedProcessName) && !m_isFirstProcessFill) {
-                                MessageBox.Show("Warning: " + m_lastSelectedProcessName + " does not appear to be an Unreal Engine title");
+                                m_iniListView.ItemsSource = null; // Because we are switching processes.
+                                InitializeConfig ( p.ProcessName );
+
+                                if ( !IsUnrealEngineGame ( gameDirectory, m_lastSelectedProcessName ) && !m_isFirstProcessFill )
+                                    {
+                                    MessageBox.Show ( "Warning: " + m_lastSelectedProcessName + " does not appear to be an Unreal Engine title" );
+                                    }
+                                }
+
+                            m_lastDefaultProcessListName = GenerateProcessName ( p );
                             }
                         }
-
-                        m_lastDefaultProcessListName = GenerateProcessName(p);
+                    }
+                catch ( Exception ex )
+                    {
+                    Console.WriteLine ( $"Exception caught: {ex}" );
                     }
                 }
-            } catch (Exception ex) {
-                Console.WriteLine($"Exception caught: {ex}");
+            
+
+        private void ComboBox_DropDownOpened ( object sender, System.EventArgs e ) {
+            if ( !m_launchMode ) {
+                m_lastSelectedProcessName = "";
+                m_lastSelectedProcessId = 0;
+
+                FillProcessList ( );
+                Update_InjectStatus ( );
+
+                m_isFirstProcessFill = false;
             }
-        }
-
-        private void ComboBox_DropDownOpened(object sender, System.EventArgs e) {
-            m_lastSelectedProcessName = "";
-            m_lastSelectedProcessId = 0;
-
-            FillProcessList();
-            Update_InjectStatus();
-
-            m_isFirstProcessFill = false;
         }
 
         private void Donate_Clicked(object sender, RoutedEventArgs e) {
@@ -972,201 +1046,386 @@ namespace UEVR {
             Process.Start(new ProcessStartInfo("https://github.com/praydog/UEVR") { UseShellExecute = true });
         }
 
-        private void Inject_Clicked(object sender, RoutedEventArgs e) {
-            // "Terminate Connected Process"
-            if (m_connected) {
-                try {
-                    var pid = m_lastSharedData?.pid;
-
-                    if (pid != null) {
-                        var target = Process.GetProcessById((int)pid);
-
-                        if (target == null || target.HasExited) {
-                            return;
-                        }
-
-                        target.WaitForInputIdle(100);
-
-                        SharedMemory.SendCommand(SharedMemory.Command.Quit);
-
-                        if (target.WaitForExit(2000)) {
-                            return;
-                        }
-
-                        target.Kill();
-                    }
-                } catch(Exception) {
+        private void LaunchModeButton_Clicked ( object sender, RoutedEventArgs e){
+          // m_LaunchModeButton.Content = m_launchMode ? "Switch to Inject Mode" : "Switch to Launch Mode";
+            m_launchMode = !m_launchMode;
+            if ( m_launchMode )
+                {
+                m_CmdLineGroup.Visibility = Visibility.Visible;
+                m_LaunchModeAppPicker.Visibility = Visibility.Visible;
+                m_processListBox.Visibility = Visibility.Collapsed;
+                m_LaunchModeText.Text = "Inject Mode";
+                m_LaunchButton.Visibility = Visibility.Visible;
+                m_injectButton.Visibility = Visibility.Collapsed; 
+                if (!string.IsNullOrEmpty(m_launchTarget) ) m_LaunchTargetView.Visibility = Visibility.Collapsed;
+                else m_LaunchTargetView.Visibility = Visibility.Visible;
+                m_LaunchModeIcon.Kind = MaterialDesignThemes.Wpf.PackIconKind.DebugStepInto;
 
                 }
-
-                return;
+            else { 
+                m_CmdLineGroup.Visibility = Visibility.Collapsed;
+                m_LaunchModeAppPicker.Visibility = Visibility.Collapsed;
+                m_LaunchModeText.Text = "Launch Mode";
+                m_LaunchButton.Visibility = Visibility.Collapsed;
+                m_injectButton.Visibility = Visibility.Visible;
+                m_processListBox.Visibility = Visibility.Visible;
+                m_LaunchTargetView.Visibility = Visibility.Collapsed;
+                m_LaunchModeIcon.Kind = MaterialDesignThemes.Wpf.PackIconKind.Launch;
+                }
             }
 
-            var selectedProcessName = m_processListBox.SelectedItem;
-
-            if (selectedProcessName == null) {
-                return;
+        private void AppPicker_Clicked(object sender, RoutedEventArgs e )
+            {
+            var openFileDialog = new OpenFileDialog
+                {
+                DefaultExt = ".exe",
+                Filter = "Executable Files (*.exe)|*.exe",
+                };
+            bool? result = openFileDialog.ShowDialog ( );
+            m_launchTarget = openFileDialog.FileName;
+            m_LaunchTargetView.Visibility = Visibility.Visible;      
+            m_LaunchTargetView.Text = m_launchTarget;
             }
 
-            var index = m_processListBox.SelectedIndex;
-            var process = m_processList[index];
-
-            if (process == null) {
-                return;
+        private void CommandLineText_Updated(object sender, RoutedEventArgs e)
+            {
+            if ( !String.IsNullOrEmpty ( m_LaunchModeCmdLine.Text ) ) LaunchModeArgs = m_LaunchModeCmdLine.Text;
             }
 
-            // Double check that the process we want to inject into exists
-            // this can happen if the user presses inject again while
-            // the previous combo entry is still selected but the old process
-            // has died.
-            try {
-                var verifyProcess = Process.GetProcessById(m_lastSelectedProcessId);
+        //private void Inject_Or_Launch_Clicked ( object sender, RoutedEventArgs e ) {
+        //        {
+        //        if ( m_launchMode )
+        //            {
+        //            Launch_Clicked ( sender, e );
+        //            }
+        //        else Inject_Clicked ( sender, e );
+        //        }
+        //    }
 
-                if (verifyProcess == null || verifyProcess.HasExited || verifyProcess.ProcessName != m_lastSelectedProcessName) {
-                    var processes = Process.GetProcessesByName(m_lastSelectedProcessName);
+        
 
-                    if (processes == null || processes.Length == 0 || !AnyInjectableProcesses(processes)) {
-                        return;
-                    }
+        private void Launch_Clicked ( object sender, RoutedEventArgs e )
+            {
+            if ( m_connected )
+                {
+                try
+                    {
+                    var _pid = m_lastSharedData?.pid;
 
-                    foreach (var candidate in processes) {
-                        if (IsInjectableProcess(candidate)) {
-                            process = candidate;
-                            break;
+                    if ( _pid != null )
+                        {
+                        var target = Process.GetProcessById ( ( int )_pid );
+
+                        if ( target == null || target.HasExited )
+                            {
+                            return;
+                            }
+
+                        target.WaitForInputIdle ( 100 );
+
+                        SharedMemory.SendCommand ( SharedMemory.Command.Quit );
+
+                        if ( target.WaitForExit ( 2000 ) )
+                            {
+                            return;
+                            }
+
+                        target.Kill ( );
                         }
                     }
+                catch ( Exception )
+                    {
 
-                    m_processList[index] = process;
-                    m_processListBox.Items[index] = GenerateProcessName(process);
-                    m_processListBox.SelectedIndex = index;
-                }
-            } catch(Exception ex) {
-                MessageBox.Show(ex.Message);
+                    }
+
                 return;
-            }
+                }
 
+            var now = DateTime.Now;
+            Process? process = null;
             string runtimeName;
 
-            if (m_openvrRadio.IsChecked == true) {
+            if ( m_openvrRadio.IsChecked == true )
+                {
                 runtimeName = "openvr_api.dll";
-            } else if (m_openxrRadio.IsChecked == true) {
+                }
+            else if ( m_openxrRadio.IsChecked == true )
+                {
                 runtimeName = "openxr_loader.dll";
-            } else {
+                }
+            else
+                {
                 runtimeName = "openvr_api.dll";
-            }
-
-            if (m_nullifyVRPluginsCheckbox.IsChecked == true) {
-                IntPtr nullifierBase;
-                if (Injector.InjectDll(process.Id, "UEVRPluginNullifier.dll", out nullifierBase) && nullifierBase.ToInt64() > 0) {
-                    if (!Injector.CallFunctionNoArgs(process.Id, "UEVRPluginNullifier.dll", nullifierBase, "nullify", true)) {
-                        MessageBox.Show("Failed to nullify VR plugins.");
-                    }
-                } else {
-                    MessageBox.Show("Failed to inject plugin nullifier.");
                 }
-            }
+            Injector.PROCESS_INFORMATION pi;
+            Injector.STARTUPINFO si = new Injector.STARTUPINFO ( );
+            var cmdline = "";
+            var creationFlag = 4u;
+            if ( !String.IsNullOrEmpty ( m_commandLinePassThroughArgs ) )
+                cmdline += m_commandLinePassThroughArgs;
+            if ( !String.IsNullOrEmpty ( LaunchModeArgs ) )
+                cmdline += LaunchModeArgs;
 
-            if (Injector.InjectDll(process.Id, runtimeName)) {
-                try {
-                    if (m_currentConfig != null) {
-                        if (m_currentConfig["Frontend_RequestedRuntime"] != runtimeName) {
-                            m_currentConfig["Frontend_RequestedRuntime"] = runtimeName;
-                            RefreshConfigUI();
-                            SaveCurrentConfig();
+            var wdir = System.IO.Path.GetDirectoryName( m_launchTarget );
+  
+            var localRuntime = Path.Combine ( wdir, runtimeName );
+            if ( File.Exists ( localRuntime ) ) File.Delete ( localRuntime ); 
+            if ( !Injector.CreateProcess ( m_launchTarget, cmdline, IntPtr.Zero, IntPtr.Zero, true, creationFlag, IntPtr.Zero, wdir, ref si, out pi ) )
+                {
+                MessageBox.Show ( "Failed to launch process" );
+                return;
+                }
+
+            var pid = pi.dwProcessId;
+           
+                //if ( m_nullifyVRPluginsCheckbox.IsChecked == true )
+                //    {
+                //    IntPtr nullifierBase;
+                //    if ( Injector.InjectDll ( pid, "UEVRPluginNullifier.dll", out nullifierBase ) && nullifierBase.ToInt64 ( ) > 0 )
+                //        {
+                //        if ( !Injector.CallFunctionNoArgs ( pid, "UEVRPluginNullifier.dll", nullifierBase, "nullify", true ) )
+                //            {
+                //            //MessageBox.Show("Failed to nullify VR plugins.");
+                //            }
+                //        }
+                //    else
+                //        {
+                //        //MessageBox.Show("Failed to inject plugin nullifier.");
+                //        }
+                //    }
+
+
+
+                if ( Injector.InjectDll ( pid, runtimeName ) )
+                    {
+                    InitializeConfig (Path.GetFileName(m_launchTarget) );
+
+                    try
+                        {
+                        if ( m_currentConfig != null )
+                            {
+                            if ( m_currentConfig [ "Frontend_RequestedRuntime" ] != runtimeName )
+                                {
+                                m_currentConfig [ "Frontend_RequestedRuntime" ] = runtimeName;
+                                RefreshConfigUI ( );
+                                SaveCurrentConfig ( );
+                                }
+                            }
                         }
-                    }
-                } catch (Exception) {
+                    catch ( Exception )
+                        {
 
+                        }
+
+                    Injector.InjectDll ( pid, "UEVRBackend.dll" );
+                    }
+                Injector.ResumeThread ( pi.hThread );
+            File.Copy ( runtimeName, localRuntime );
+                m_lastAutoInjectTime = now;
+                //m_commandLineAttachExe = null;
+
+                if ( m_focusGameOnInjectionCheckbox.IsChecked == true )
+                    {
+                    SwitchToThisWindow (Process.GetProcessById(pi.dwProcessId).MainWindowHandle, true );
+                    }
+                }           
+
+            private void Inject_Clicked ( object sender, RoutedEventArgs e ) {
+                // "Terminate Connected Process"
+                if ( m_connected ) {
+                    try {
+                        var pid = m_lastSharedData?.pid;
+
+                        if ( pid != null ) {
+                            var target = Process.GetProcessById ( ( int ) pid );
+
+                            if ( target == null || target.HasExited ) {
+                                return;
+                            }
+
+                            target.WaitForInputIdle ( 100 );
+
+                            SharedMemory.SendCommand ( SharedMemory.Command.Quit );
+
+                            if ( target.WaitForExit ( 2000 ) ) {
+                                return;
+                            }
+
+                            target.Kill ( );
+                        }
+                    } catch ( Exception ) {
+
+                    }
+
+                    return;
                 }
 
-                Injector.InjectDll(process.Id, "UEVRBackend.dll");
-            }
+                var selectedProcessName = m_processListBox.SelectedItem;
 
-            if (m_focusGameOnInjectionCheckbox.IsChecked == true)
-            {
-                SwitchToThisWindow(process.MainWindowHandle, true);
-            }
-        }
+                if ( selectedProcessName == null ) {
+                    return;
+                }
 
-        private string GenerateProcessName(Process p) {
-            return p.ProcessName + " (pid: " + p.Id + ")" + " (" + p.MainWindowTitle + ")";
-        }
+                var index = m_processListBox.SelectedIndex;
+                var process = m_processList [ index ];
 
-        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool IsWow64Process([In] IntPtr hProcess, [Out] out bool wow64Process);
+                if ( process == null ) {
+                    return;
+                }
 
-        private bool IsInjectableProcess(Process process) {
-        
-            try {
-                if (Environment.Is64BitOperatingSystem) {
+                // Double check that the process we want to inject into exists
+                // this can happen if the user presses inject again while
+                // the previous combo entry is still selected but the old process
+                // has died.
+                try {
+                    var verifyProcess = Process.GetProcessById ( m_lastSelectedProcessId );
+
+                    if ( verifyProcess == null || verifyProcess.HasExited || verifyProcess.ProcessName != m_lastSelectedProcessName ) {
+                        var processes = Process.GetProcessesByName ( m_lastSelectedProcessName );
+
+                        if ( processes == null || processes.Length == 0 || !AnyInjectableProcesses ( processes ) ) {
+                            return;
+                        }
+
+                        foreach ( var candidate in processes ) {
+                            if ( IsInjectableProcess ( candidate ) ) {
+                                process = candidate;
+                                break;
+                            }
+                        }
+
+                        m_processList [ index ] = process;
+                        m_processListBox.Items [ index ] = GenerateProcessName ( process );
+                        m_processListBox.SelectedIndex = index;
+                    }
+                } catch ( Exception ex ) {
+                    MessageBox.Show ( ex.Message );
+                    return;
+                }
+
+                string runtimeName;
+
+                if ( m_openvrRadio.IsChecked == true ) {
+                    runtimeName = "openvr_api.dll";
+                } else if ( m_openxrRadio.IsChecked == true ) {
+                    runtimeName = "openxr_loader.dll";
+                } else {
+                    runtimeName = "openvr_api.dll";
+                }
+
+                if ( m_nullifyVRPluginsCheckbox.IsChecked == true ) {
+                    IntPtr nullifierBase;
+                    if ( Injector.InjectDll ( process.Id, "UEVRPluginNullifier.dll", out nullifierBase ) && nullifierBase.ToInt64 ( ) > 0 ) {
+                        if ( !Injector.CallFunctionNoArgs ( process.Id, "UEVRPluginNullifier.dll", nullifierBase, "nullify", true ) ) {
+                            MessageBox.Show ( "Failed to nullify VR plugins." );
+                        }
+                    } else {
+                        MessageBox.Show ( "Failed to inject plugin nullifier." );
+                    }
+                }
+
+                if ( Injector.InjectDll ( process.Id, runtimeName ) ) {
                     try {
-                        bool isWow64 = false;
-                        if (IsWow64Process(process.Handle, out isWow64) && isWow64) {
+                        if ( m_currentConfig != null ) {
+                            if ( m_currentConfig [ "Frontend_RequestedRuntime" ] != runtimeName ) {
+                                m_currentConfig [ "Frontend_RequestedRuntime" ] = runtimeName;
+                                RefreshConfigUI ( );
+                                SaveCurrentConfig ( );
+                            }
+                        }
+                    } catch ( Exception ) {
+
+                    }
+
+                    Injector.InjectDll ( process.Id, "UEVRBackend.dll" );
+                }
+
+                if ( m_focusGameOnInjectionCheckbox.IsChecked == true )
+                {
+                    SwitchToThisWindow ( process.MainWindowHandle, true );
+                }
+            }
+
+            private string GenerateProcessName ( Process p ) {
+                return p.ProcessName + " (pid: " + p.Id + ")" + " (" + p.MainWindowTitle + ")";
+            }
+
+            [DllImport ( "kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi )]
+            [return: MarshalAs ( UnmanagedType.Bool )]
+            private static extern bool IsWow64Process ( [In] IntPtr hProcess, [Out] out bool wow64Process );
+
+            private bool IsInjectableProcess ( Process process ) {
+
+                try {
+                    if ( Environment.Is64BitOperatingSystem ) {
+                        try {
+                            bool isWow64 = false;
+                            if ( IsWow64Process ( process.Handle, out isWow64 ) && isWow64 ) {
+                                return false;
+                            }
+                        } catch {
+                            // If we threw an exception here, then the process probably can't be accessed anyways.
                             return false;
                         }
-                    } catch {
-                        // If we threw an exception here, then the process probably can't be accessed anyways.
+                    }
+
+                    if ( process.MainWindowTitle.Length == 0 ) {
                         return false;
                     }
-                }
 
-                if (process.MainWindowTitle.Length == 0) {
-                    return false;
-                }
-
-                if (process.Id == Process.GetCurrentProcess().Id) {
-                    return false;
-                }
-
-                if (!m_executableFilter.IsValidExecutable(process.ProcessName.ToLower())) {
-                    return false;
-                }
-
-                foreach (ProcessModule module in process.Modules) {
-                    if (module.ModuleName == null) {
-                        continue;
-                    }
-
-                    string moduleLow = module.ModuleName.ToLower();
-                    if (moduleLow == "d3d11.dll" || moduleLow == "d3d12.dll") {
-                        return true ;
-                    }
-                }
-
-                // Check if the excluded processes file exists
-                if (File.Exists(excludedProcessesFile)) {
-                    
-                    List<string> excludedProcesses = new List<string>();
-    
-                    // Read excluded process names from the text file
-                    excludedProcesses = File.ReadAllLines(excludedProcessesFile).ToList();
-    
-                    // Check if the process name is in the excluded list
-                    if (excludedProcesses.Contains(process.ProcessName)) {
+                    if ( process.Id == Process.GetCurrentProcess ( ).Id ) {
                         return false;
                     }
-                    
-                }
 
-                return false;
-            } catch(Exception ex) {
-                Console.WriteLine(ex.ToString());
-                return false;
-            }
-        }
+                    if ( !m_executableFilter.IsValidExecutable ( process.ProcessName.ToLower ( ) ) ) {
+                        return false;
+                    }
 
-        private bool AnyInjectableProcesses(Process[] processList) {
-            foreach (Process process in processList) {
-                if (IsInjectableProcess(process)) {
-                    return true;
+                    foreach ( ProcessModule module in process.Modules ) {
+                        if ( module.ModuleName == null ) {
+                            continue;
+                        }
+
+                        string moduleLow = module.ModuleName.ToLower ( );
+                        if ( moduleLow == "d3d11.dll" || moduleLow == "d3d12.dll" ) {
+                            return true;
+                        }
+                    }
+
+                    // Check if the excluded processes file exists
+                    if ( File.Exists ( excludedProcessesFile ) ) {
+
+                        List<string> excludedProcesses = new List<string> ( );
+
+                        // Read excluded process names from the text file
+                        excludedProcesses = File.ReadAllLines ( excludedProcessesFile ).ToList ( );
+
+                        // Check if the process name is in the excluded list
+                        if ( excludedProcesses.Contains ( process.ProcessName ) ) {
+                            return false;
+                        }
+
+                    }
+
+                    return false;
+                } catch ( Exception ex ) {
+                    Console.WriteLine ( ex.ToString ( ) );
+                    return false;
                 }
             }
 
-            return false;
-        }
+            private bool AnyInjectableProcesses ( Process [ ] processList ) {
+                foreach ( Process process in processList ) {
+                    if ( IsInjectableProcess ( process ) )
+                        return true;
+                }
+                return false;
+            }
+        
+
         private SemaphoreSlim m_processSemaphore = new SemaphoreSlim(1, 1); // create a semaphore with initial count of 1 and max count of 1
         private string? m_lastDefaultProcessListName = null;
+        private TimeSpan oneSecond = TimeSpan.FromSeconds ( 1 );
 
         private async void FillProcessList() {
             // Allow the previous running FillProcessList task to finish first
@@ -1231,5 +1490,6 @@ namespace UEVR {
                 m_processSemaphore.Release();
             }
         }
+
     }
 }
