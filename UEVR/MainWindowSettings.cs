@@ -43,6 +43,14 @@ namespace UEVR {
             set { this["FocusGameOnInjection"] = value; }
         }
 
+        [UserScopedSettingAttribute ( )]
+        [DefaultSettingValueAttribute ( "true" )]
+        public bool AutoStartRuntimeCheckbox
+            {
+            get { return ( bool ) this [ "AutoStartRuntimeCheckBox" ]; }
+            set { this [ "AutoStartRuntimeCheckBox" ] = value; }
+            }
+
         //[UserScopedSettingAttribute ( )]
         //[DefaultSettingValueAttribute ( "false" )]
         //public bool m_LaunchModeButton
@@ -51,5 +59,5 @@ namespace UEVR {
         //    set { this [ "LaunchModeButton" ] = value; }
         //}
 
-    }
+        }
 }

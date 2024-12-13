@@ -269,7 +269,8 @@
                                 MinWidth="500"
                                 VerticalAlignment="Top"
                                 DropDownOpened="ComboBox_DropDownOpened"
-                                SelectionChanged="ComboBox_SelectionChanged" />
+                                SelectionChanged="ComboBox_SelectionChanged"
+                                Text="Select Process" />
                             <Button
                                 x:Name="m_LaunchButton"
                                 Click="Launch_Clicked"
@@ -278,7 +279,8 @@
                             <Button
                                 x:Name="m_injectButton"
                                 Click="Inject_Clicked"
-                                Content="Inject" />
+                                Content="Inject"
+                                Visibility="Visible" />
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="m_openvrRadio" Content="OpenVR" />
                                 <RadioButton x:Name="m_openxrRadio" Content="OpenXR" />
@@ -292,6 +294,13 @@
                                         HorizontalAlignment="Left"
                                         IsChecked="True" />
                                     <TextBlock Text="Focus game on injection" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton
+                                        x:Name="m_autoStartRuntimeCheckbox"
+                                        HorizontalAlignment="Left"
+                                        IsChecked="True" />
+                                    <TextBlock Text="Auto start runtime" TextWrapping="Wrap" />
                                 </StackPanel>
                             </StackPanel>
                             <TextBlock

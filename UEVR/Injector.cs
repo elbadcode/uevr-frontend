@@ -83,24 +83,35 @@ public static extern uint ResumeThread(IntPtr hThread);
         // Inject the DLL into the target process
         // dllPath is local filename, relative to EXE.
         public static bool InjectDll(int processId, string dllPath, out IntPtr dllBase) {
-            string originalPath = dllPath;
+            //use old behavior if we just pass a filename otherwise if passing a path we just try to inject the remote path
+            if ( !dllPath.Contains ( "\\" ))
+                {
+                string originalPath = dllPath;
+                try
+                    {
+                    var exeDirectory = AppContext.BaseDirectory;
 
-            try {
-                var exeDirectory = AppContext.BaseDirectory;
+                    if ( exeDirectory != null )
+                        {
+                        var newPath = Path.Combine ( exeDirectory, dllPath );
 
-                if (exeDirectory != null) {
-                    var newPath = Path.Combine(exeDirectory, dllPath);
+                        if ( System.IO.File.Exists ( newPath ) )
+                            {
+                            dllPath = Path.Combine ( exeDirectory, dllPath );
+                            }
+                        }
+                    }
+                catch ( Exception )
+                    {
+                    }
 
-                    if (System.IO.File.Exists(newPath)) {
-                        dllPath = Path.Combine(exeDirectory, dllPath);
+                if ( !System.IO.File.Exists ( dllPath ) )
+                    {
+                    MessageBox.Show ( $"{originalPath} does not appear to exist! Check if any anti-virus software has deleted the file. Reinstall UEVR if necessary.\n\nBaseDirectory: {AppContext.BaseDirectory}" );
                     }
                 }
-            } catch (Exception) {
-            }
 
-            if (!System.IO.File.Exists(dllPath)) {
-                MessageBox.Show($"{originalPath} does not appear to exist! Check if any anti-virus software has deleted the file. Reinstall UEVR if necessary.\n\nBaseDirectory: {AppContext.BaseDirectory}");
-            }
+            RtlAdjustPrivilege ( 20, true, IsThreadPrivilege: false, out var _ );
 
             dllBase = IntPtr.Zero;
 
@@ -115,8 +126,8 @@ public static extern uint ResumeThread(IntPtr hThread);
             }
 
             // Get the address of the LoadLibrary function
-            IntPtr loadLibraryAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryW");
-
+            //IntPtr loadLibraryAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryW");
+            IntPtr loadLibraryAddress = GetProcAddress ( LoadLibrary ( "kernel32.dll" ), "LoadLibraryW" );
             if (loadLibraryAddress == IntPtr.Zero) {
                 MessageBox.Show("Could not obtain LoadLibraryW address in the target process.");
                 return false;
@@ -136,7 +147,7 @@ public static extern uint ResumeThread(IntPtr hThread);
             WriteProcessMemory(processHandle, dllPathAddress, bytes, (uint)(fullPath.Length * 2), out bytesWritten);
 
             // Create a remote thread in the target process that calls LoadLibrary with the DLL path
-            IntPtr threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, loadLibraryAddress, dllPathAddress, 0, IntPtr.Zero);
+            IntPtr threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, loadLibraryAddress, dllPathAddress, 0,IntPtr.Zero);
 
             if (threadHandle == IntPtr.Zero) {
                 MessageBox.Show("Failed to create remote thread in the target processs.");
