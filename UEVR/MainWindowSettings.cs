@@ -45,19 +45,12 @@ namespace UEVR {
 
         [UserScopedSettingAttribute ( )]
         [DefaultSettingValueAttribute ( "true" )]
-        public bool AutoStartRuntimeCheckbox
+        public bool ExperimentalSettingsCheckbox
             {
-            get { return ( bool ) this [ "AutoStartRuntimeCheckBox" ]; }
-            set { this [ "AutoStartRuntimeCheckBox" ] = value; }
+            get { return ( bool ) this [ "ExperimentalSettingsCheckBox" ]; }
+            set { this [ "ExperimentalSettingsCheckBox" ] = value; }
             }
 
-        //[UserScopedSettingAttribute ( )]
-        //[DefaultSettingValueAttribute ( "false" )]
-        //public bool m_LaunchModeButton
-        //{
-        //    get { return ( bool ) this [ "LaunchModeButton" ]; }
-        //    set { this [ "LaunchModeButton" ] = value; }
-        //}
 
         }
 }

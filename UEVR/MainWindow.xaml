@@ -23,7 +23,6 @@
     WindowStyle="None"
     mc:Ignorable="d">
     <StackPanel x:Name="m_vertStackPanel" Orientation="Vertical">
-
         <Border Background="#FF1A1B1C" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Border.Style>
                 <Style TargetType="{x:Type Border}">
@@ -41,7 +40,7 @@
                     VerticalAlignment="Center"
                     FontWeight="Bold"
                     Foreground="White"
-                    Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}" />
+                    Text="{Binding Title, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
                 <Button
                     Width="30"
                     Height="30"
@@ -135,7 +134,10 @@
                                     Width="30"
                                     Height="30"
                                     HorizontalAlignment="Center"
-                                    Kind="Folder" />
+                                    AllowDrop="True"
+                                    Drop="OpenGameDir_Drop"
+                                    Kind="Folder"
+                                    PreviewDragOver="OpenGameDir_PreviewDragOver" />
                                 <TextBlock
                                     HorizontalAlignment="Center"
                                     FontSize="10"
@@ -152,8 +154,10 @@
                                 <materialDesign:PackIcon
                                     Width="30"
                                     Height="30"
+                                    Margin="0,0,-5,0"
                                     HorizontalAlignment="Center"
-                                    Kind="Export" />
+                                    Kind="Export"
+                                    RenderTransformOrigin="0.5,0.5" />
                                 <TextBlock
                                     HorizontalAlignment="Center"
                                     FontSize="10"
@@ -171,7 +175,11 @@
                                     Width="30"
                                     Height="30"
                                     HorizontalAlignment="Center"
+                                    AllowDrop="True"
+                                    Drop="ImportConfig_Drop"
                                     Kind="Import"
+                                    PreviewDragEnter="ImportConfig_PreviewDragEnter"
+                                    PreviewDragOver="ImportConfig_PreviewDragOver"
                                     RenderTransformOrigin="0.5,0.5" />
                                 <TextBlock
                                     HorizontalAlignment="Center"
@@ -182,12 +190,25 @@
                     </MenuItem>
                 </Menu>
                 <StackPanel
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    DockPanel.Dock="Bottom"
+                    Orientation="Horizontal" />
+
+                <StackPanel
                     HorizontalAlignment="Center"
                     VerticalAlignment="Bottom"
                     DockPanel.Dock="Bottom"
                     Orientation="Horizontal">
-                    <TextBlock Text="Author: praydog" TextWrapping="Wrap" />
+                    <TextBlock Text="Author: praydog    " TextWrapping="Wrap" />
+                    <TextBlock
+                        Margin="0,1,-200,0"
+                        OverridesDefaultStyle="True"
+                        RenderTransformOrigin="0,0"
+                        Text="Experimental version by lobotomyx"
+                        TextWrapping="Wrap" />
                 </StackPanel>
+
                 <StackPanel
                     HorizontalAlignment="Center"
                     VerticalAlignment="Bottom"
@@ -232,35 +253,51 @@
                     </Button>
                 </StackPanel>
             </DockPanel>
-            <StackPanel x:Name="m_topStackPanel" Orientation="Vertical">
-                <GroupBox
-                    x:Name="m_nNotificationsGroupBox"
-                    ClipToBounds="True"
-                    Header="Notifications"
-                    Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock
-                            x:Name="m_adminExplanation"
-                            Text="Some executables may not show up or fail to inject unless started as Administrator."
-                            TextWrapping="Wrap"
-                            Visibility="Collapsed" />
-                        <Button
-                            x:Name="m_restartAsAdminButton"
-                            Click="RestartAsAdminButton_Click"
-                            Content="Restart as Administrator"
-                            Visibility="Collapsed" />
-                    </StackPanel>
-                </GroupBox>
+            <StackPanel x:Name="m_topStackPanel" Orientation="Vertical" Margin="0,0,0,26" ClipToBounds="True">
+                <Border Background="#FF1A1B1C" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <Border.Style>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Cursor" Value="SizeAll" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <GroupBox
+                        x:Name="m_nNotificationsGroupBox"
+                        ClipToBounds="True"
+                        Header="Notifications"
+                        Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="m_adminExplanation"
+                                Text="Some executables may not show up or fail to inject unless started as Administrator."
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="m_restartAsAdminButton"
+                                Click="RestartAsAdminButton_Click"
+                                Content="Restart as Administrator"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </GroupBox>
+                </Border>
                 <StackPanel Orientation="Horizontal">
                     <GroupBox ClipToBounds="True" Header="Inject">
                         <StackPanel HorizontalAlignment="Left" ClipToBounds="True">
                             <Button
                                 x:Name="m_LaunchModeAppPicker"
+                                AllowDrop="True"
                                 Click="AppPicker_Clicked"
                                 Content="Choose Application to Launch"
+                                Drop="AppPicker_Drop"
+                                PreviewDragOver="AppPicker_PreviewDragOver"
                                 Visibility="Collapsed" />
                             <TextBox
                                 x:Name="m_LaunchTargetView"
+                                AllowDrop="True"
                                 IsReadOnly="True"
                                 Text=""
                                 Visibility="Collapsed" />
@@ -292,20 +329,28 @@
                                     <ToggleButton
                                         x:Name="m_focusGameOnInjectionCheckbox"
                                         HorizontalAlignment="Left"
-                                        IsChecked="True" />
+                                        IsChecked="True"
+                                        Visibility="Visible" />
                                     <TextBlock Text="Focus game on injection" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal">
+                                <StackPanel Orientation="Horizontal" Visibility="Visible">
                                     <ToggleButton
-                                        x:Name="m_autoStartRuntimeCheckbox"
+                                        x:Name="m_ExperimentalSettingsCheckbox"
                                         HorizontalAlignment="Left"
                                         IsChecked="True" />
-                                    <TextBlock Text="Auto start runtime" TextWrapping="Wrap" />
+                                    <TextBlock Text="Use experimental settings" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Visibility="Collapsed">
+                                    <ToggleButton
+                                        x:Name="m_NoAutoInit"
+                                        HorizontalAlignment="Left"
+                                        IsChecked="false" />
+                                    <TextBlock Text="No Auto Runtime Init" TextWrapping="Wrap" />
                                 </StackPanel>
                             </StackPanel>
                             <TextBlock
                                 x:Name="m_connectionStatus"
-                                Height="41"
+                                Height="21"
                                 Text="Unknown status"
                                 TextWrapping="Wrap" />
                             <StackPanel
@@ -320,6 +365,8 @@
                                     Text="Enter Command Line:  " />
                                 <TextBox
                                     x:Name="m_LaunchModeCmdLine"
+                                    AllowDrop="True"
+                                    Focusable="True"
                                     Text=""
                                     TextChanged="CommandLineText_Updated" />
                                 <TextBlock Text="" TextWrapping="Wrap" />
@@ -334,7 +381,7 @@
                         Grid.Row="1"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
-                        MaxHeight="640">
+                        MaxHeight="480">
                         <ListView.Resources>
                             <DataTemplate x:Key="ComboBoxTemplate">
                                 <ComboBox
@@ -389,5 +436,7 @@
                 </GroupBox>
             </StackPanel>
         </StackPanel>
+
     </StackPanel>
+
 </Window>

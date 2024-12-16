@@ -227,6 +227,47 @@ public static extern uint ResumeThread(IntPtr hThread);
             return true;
         }
 
-        
-    }
+
+        [Flags]
+        private enum SnapshotFlags : uint
+            {
+            HeapList = 0x00000001,
+            Process = 0x00000002,
+            Thread = 0x00000004,
+            Module = 0x00000008,
+            Module32 = 0x00000010,
+            Inherit = 0x80000000,
+            All = 0x0000001F,
+            NoHeaps = 0x40000000
+            }
+
+        [DllImport ( "toolhelp.dll" )]
+        private static extern IntPtr CreateToolhelp32Snapshot ( SnapshotFlags dwFlags, int th32ProcessID );
+
+        [StructLayout ( LayoutKind.Sequential )]
+        public struct PROCESSENTRY32
+            {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs ( UnmanagedType.ByValTStr, SizeConst = 260 )] public string szExeFile;
+            };
+
+
+
+        [DllImport ( "psapi.dll", SetLastError = true )]
+        public static extern bool EnumProcessModulesEx ( IntPtr hProcess, [Out] IntPtr [ ] lphModule, uint cb, out uint lpcbNeeded, uint dwFilterFlag );
+
+
+        [DllImport ( "kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode )]
+        public static extern bool CreateProcessWithToken ( string lpApplicationName, string lpCommandLine, nint lpProcessAttributes, nint lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, nint lpEnvironment, string lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation );
+
+
+        }
 }
