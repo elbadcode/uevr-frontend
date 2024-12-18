@@ -51,6 +51,13 @@ namespace UEVR {
             set { this [ "ExperimentalSettingsCheckBox" ] = value; }
             }
 
+        [UserScopedSettingAttribute ( )]
+        [DefaultSettingValueAttribute ( "false" )]
+        public bool LaunchModeNextStart
+            {
+            get { return ( bool ) this [ "LaunchModeNextStart" ]; }
+            set { this [ "LaunchModeNextStart" ] = value; }
+            }
 
         }
 }

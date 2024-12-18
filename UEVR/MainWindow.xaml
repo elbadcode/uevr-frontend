@@ -253,18 +253,11 @@
                     </Button>
                 </StackPanel>
             </DockPanel>
-            <StackPanel x:Name="m_topStackPanel" Orientation="Vertical" Margin="0,0,0,26" ClipToBounds="True">
-                <Border Background="#FF1A1B1C" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                    <Border.Style>
-                        <Style TargetType="{x:Type Border}">
-                            <Setter Property="Cursor" Value="Hand" />
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Cursor" Value="SizeAll" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
+            <StackPanel
+                x:Name="m_topStackPanel"
+                Margin="0,0,0,26"
+                ClipToBounds="True"
+                Orientation="Vertical">
                     <GroupBox
                         x:Name="m_nNotificationsGroupBox"
                         ClipToBounds="True"
@@ -283,7 +276,7 @@
                                 Visibility="Collapsed" />
                         </StackPanel>
                     </GroupBox>
-                </Border>
+           
                 <StackPanel Orientation="Horizontal">
                     <GroupBox ClipToBounds="True" Header="Inject">
                         <StackPanel HorizontalAlignment="Left" ClipToBounds="True">
@@ -306,6 +299,7 @@
                                 MinWidth="500"
                                 VerticalAlignment="Top"
                                 DropDownOpened="ComboBox_DropDownOpened"
+                                IsDropDownOpen="True"
                                 SelectionChanged="ComboBox_SelectionChanged"
                                 Text="Select Process" />
                             <Button
@@ -376,6 +370,7 @@
                     </GroupBox>
                 </StackPanel>
                 <GroupBox ClipToBounds="True" Header="Game Settings">
+
                     <ListView
                         x:Name="m_iniListView"
                         Grid.Row="1"

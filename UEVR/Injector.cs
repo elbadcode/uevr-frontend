@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading;
 
 namespace UEVR {
     class Injector {
@@ -80,6 +81,48 @@ public static extern uint ResumeThread(IntPtr hThread);
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
 
+
+        public static bool InjectDlls ( IntPtr pHandle, List<string> dllPaths )
+            {
+            if ( pHandle == IntPtr.Zero )
+                {
+                Console.WriteLine ( "Failed to open process handle" );
+                return false;
+                }
+            if ( dllPaths.Count == 0 )
+                return true;
+
+            RtlAdjustPrivilege ( 20, true, IsThreadPrivilege: false, out var _ );
+
+            var kernel32 = LoadLibrary ( "kernel32.dll" );
+            var loadLibrary = GetProcAddress ( kernel32, "LoadLibraryW" );
+
+            var remoteVa = VirtualAllocEx ( pHandle, IntPtr.Zero, 0x1000,
+            AllocationType.COMMIT | AllocationType.RESERVE, MemoryProtection.READWRITE );
+            if ( remoteVa == IntPtr.Zero )
+                return false;
+
+            foreach ( var dllPath in dllPaths )
+                {
+                Console.WriteLine ( dllPath );
+                var nativeString = Marshal.StringToHGlobalUni ( dllPath );
+                var bytes = Encoding.Unicode.GetBytes ( dllPath );
+                Marshal.FreeHGlobal ( nativeString );
+
+                if ( !WriteProcessMemory ( pHandle, remoteVa, bytes, (uint) bytes.Length * 2, out var bytesWritten ) )
+                    return false;
+
+                var thread = CreateRemoteThread ( pHandle, IntPtr.Zero, 0, loadLibrary, remoteVa, 0, IntPtr.Zero );
+                if ( thread == IntPtr.Zero )
+                    return false;
+
+            WaitForSingleObject ( thread, uint.MaxValue );
+              CloseHandle ( thread );
+                WriteProcessMemory ( pHandle, remoteVa, new byte [ bytes.Length ], (uint) bytes.Length, out _ );
+                }
+            return true;
+            }
+
         // Inject the DLL into the target process
         // dllPath is local filename, relative to EXE.
         public static bool InjectDll(int processId, string dllPath, out IntPtr dllBase) {
@@ -118,7 +161,7 @@ public static extern uint ResumeThread(IntPtr hThread);
             string fullPath = Path.GetFullPath(dllPath);
 
             // Open the target process with the necessary access
-            IntPtr processHandle = OpenProcess(0x1F0FFF, false, processId);
+            IntPtr processHandle = OpenProcess(0x1F0FFF, true, processId);
 
             if (processHandle == IntPtr.Zero) {
                 MessageBox.Show("Could not open a handle to the target process.\nYou may need to start this program as an administrator, or the process may be protected.");
@@ -239,6 +282,36 @@ public static extern uint ResumeThread(IntPtr hThread);
             Inherit = 0x80000000,
             All = 0x0000001F,
             NoHeaps = 0x40000000
+            }
+
+        internal static class AllocationType
+            {
+            public const uint COMMIT = 0x1000;
+            public const uint RESERVE = 0x2000;
+            public const uint RESET = 0x80000;
+            public const uint LARGE_PAGES = 0x20000000;
+            public const uint PHYSICAL = 0x400000;
+            public const uint TOP_DOWN = 0x100000;
+            public const uint WRITE_WATCH = 0x200000;
+            public const uint RESET_UNDO = 0x1000000;
+            }
+
+        internal static class FreeType
+            {
+            public const uint DECOMMIT = 0x4000;
+            public const uint RELEASE = 0x8000;
+            }
+
+        internal static class MemoryProtection
+            {
+            public const uint EXECUTE = 0x10;
+            public const uint EXECUTE_READ = 0x20;
+            public const uint EXECUTE_READWRITE = 0x40;
+            public const uint EXECUTE_WRITECOPY = 0x80;
+            public const uint NOACCESS = 0x01;
+            public const uint READONLY = 0x02;
+            public const uint READWRITE = 0x04;
+            public const uint WRITECOPY = 0x08;
             }
 
         [DllImport ( "toolhelp.dll" )]
