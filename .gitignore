@@ -6,3 +6,9 @@ UEVR/obj/
 UEVR/bin/
 UEVR/.vscode/
 /12.cs
+/ClassLibrary1
+/ConsoleApplication1
+/ConsoleApplication1/cfg/CMakeLists.txt
+/kerneltest
+/KernelTestShell
+/_deps
