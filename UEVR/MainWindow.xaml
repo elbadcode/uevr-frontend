@@ -7,6 +7,7 @@
     xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="UEVR"
+    AllowsTransparency="True"
     Background="#FF1A1B1C"
     Closing="MainWindow_Closing"
     FontFamily="{DynamicResource MaterialDesignFont}"
@@ -91,6 +92,7 @@
                                     HorizontalAlignment="Center"
                                     Kind="Folder" />
                                 <TextBlock
+                                    x:Name="m_openConfigDirText"
                                     HorizontalAlignment="Center"
                                     FontSize="10"
                                     Text="Open Global Dir" />
@@ -258,25 +260,25 @@
                 Margin="0,0,0,26"
                 ClipToBounds="True"
                 Orientation="Vertical">
-                    <GroupBox
-                        x:Name="m_nNotificationsGroupBox"
-                        ClipToBounds="True"
-                        Header="Notifications"
-                        Visibility="Collapsed">
-                        <StackPanel>
-                            <TextBlock
-                                x:Name="m_adminExplanation"
-                                Text="Some executables may not show up or fail to inject unless started as Administrator."
-                                TextWrapping="Wrap"
-                                Visibility="Collapsed" />
-                            <Button
-                                x:Name="m_restartAsAdminButton"
-                                Click="RestartAsAdminButton_Click"
-                                Content="Restart as Administrator"
-                                Visibility="Collapsed" />
-                        </StackPanel>
-                    </GroupBox>
-           
+                <GroupBox
+                    x:Name="m_nNotificationsGroupBox"
+                    ClipToBounds="True"
+                    Header="Notifications"
+                    Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock
+                            x:Name="m_adminExplanation"
+                            Text="Some executables may not show up or fail to inject unless started as Administrator."
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                        <Button
+                            x:Name="m_restartAsAdminButton"
+                            Click="RestartAsAdminButton_Click"
+                            Content="Restart as Administrator"
+                            Visibility="Collapsed" />
+                    </StackPanel>
+                </GroupBox>
+
                 <StackPanel Orientation="Horizontal">
                     <GroupBox ClipToBounds="True" Header="Inject">
                         <StackPanel HorizontalAlignment="Left" ClipToBounds="True">
@@ -327,7 +329,7 @@
                                         Visibility="Visible" />
                                     <TextBlock Text="Focus game on injection" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Visibility="Visible">
+                                <StackPanel Orientation="Horizontal" Visibility="Collapsed">
                                     <ToggleButton
                                         x:Name="m_ExperimentalSettingsCheckbox"
                                         HorizontalAlignment="Left"
@@ -361,6 +363,7 @@
                                     x:Name="m_LaunchModeCmdLine"
                                     AllowDrop="True"
                                     Focusable="True"
+                                    KeyDown="LaunchModeCmdLine_KeyDown"
                                     Text=""
                                     TextChanged="CommandLineText_Updated" />
                                 <TextBlock Text="" TextWrapping="Wrap" />

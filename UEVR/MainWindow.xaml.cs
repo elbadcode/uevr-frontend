@@ -40,6 +40,8 @@ using System.Security.Cryptography;
 using static System.Net.Mime.MediaTypeNames;
 using System.Security.AccessControl;
 using static UEVR.Injector;
+using System.Windows.Interop;
+using System.IO.Pipes;
 
 
 namespace UEVR {
@@ -186,6 +188,12 @@ namespace UEVR {
             Interval = new TimeSpan(0, 0, 1)
         };
 
+        private const int WM_USER = 0x0400;
+        private const int MessagePtr = WM_USER + 1;
+        private NamedPipeServerStream pipeServer;
+
+
+
         private IConfiguration? m_currentConfig = null;
         private string? m_currentConfigPath = null;
         private ExecutableFilter m_executableFilter = new ExecutableFilter();
@@ -199,48 +207,124 @@ namespace UEVR {
         private bool m_startSuspended = true;
         //simply leaves it suspended
         public bool m_waitForDebugger = false;
-
-
+        public bool m_multiHook = false;
+        public bool m_mountToGame = false;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
 
-        public MainWindow() {
-            InitializeComponent();
+        public MainWindow ( ) {
+            string [ ] args = Environment.GetCommandLineArgs ( );
+            this.SourceInitialized += MainWindow_SourceInitialized;
+
+            InitializeComponent ( );
             
             // Grab the command-line arguments
-            string[] args = Environment.GetCommandLineArgs();
 
             // Parse and handle arguments
             foreach (string arg in args) {
-                if (arg.EndsWith(".exe")) {
-                    m_commandLineAttachExe = arg.Split('=')[1];
+                if (arg.EndsWith(".exe")) {                  
                     if (arg.StartsWith("--attach=")) {
+                        m_commandLineAttachExe = arg.Split ( '=' ) [ 1 ];
                         m_launchMode = false;
                     }
-                    //allow directly setting launch mode from arg, leaving old behavior on --attach for other launchers to call 
-                    //I guess for consistency I should refactor to using an actual window setting
-                    else if (arg.StartsWith("--launch")){
-                        m_launchMode = true;
-                        LaunchModeEnabledImpl ( );                        
-                        if ( arg.Contains ( "=" ) )
+                    
+                    else if ( Path.IsPathFullyQualified ( arg ) )
                             {
-                            m_launchTarget = arg.Split ( '=' ) [ 1 ];
-                            if ( args.Length > 1 )
-                                {
-                                foreach ( var _arg in args.Skip ( 1 ) )
-                                    m_LaunchModeArgs += " "+_arg;
-                                }
-                            InitializeConfig ( Path.GetFileNameWithoutExtension ( m_launchTarget ) );
-                            Launch_Clicked_Impl ( );
-                            }                      
+                        LaunchModeEnabledImpl ( );
+                        m_launchTarget = arg;
+                        m_launchMode = true;
+                            }
+                         }
+                else if ( arg.StartsWith ( "--launch" ) )
+                    {
+                    LaunchModeEnabledImpl ( );
+                    m_launchMode = true;
+                    m_launchTarget = arg.Split ( '=' ) [ 1 ];
+                    }
+                //no exe
+                else
+                    {
+                    if ( arg.EndsWith ( ".zip" ) ) ImportConfig_Impl ( arg );
+                    else if ( arg.StartsWith ( "--launch" ) )
+                        {
+                        LaunchModeEnabledImpl ( );
+                        m_launchMode = true;
+                        m_launchTarget = arg.Split ( '=' ) [ 1 ];
+                        }
+                    else if ( arg.StartsWith ( "--debugger" ) )
+                        m_waitForDebugger = true;
+                    else if ( arg.StartsWith ( "--hooklauncher" ) ) m_multiHook = true;
+                    else if ( arg.StartsWith ( "--mount" ) ) m_mountToGame = true;
+                    else if ( arg.StartsWith ( "--nosuspend" ) )
+                        m_startSuspended = false;
+                    else if ( arg.EndsWith ( "UECommandLine.txt" ) )
+                        {
+                        if ( File.Exists ( arg ) )
+                            {
+                            m_LaunchModeArgs = File.ReadAllText ( arg );
+                            }
+                        }
+                    }
+                if (m_launchMode == true)
+                    {
+                    var gameName = Path.GetFileNameWithoutExtension ( m_launchTarget );
+                    InitializeConfig ( gameName );
+                    //awkward but this is so init config can load from last commandline file which also saves the path
+                    if ( gameName != m_launchTarget ) Launch_Clicked_Impl ( );
                     }
                 }
+
             }
-        }
+
+        private void MainWindow_SourceInitialized ( object sender, EventArgs e )
+            {
+            StartServer ( );
+            }
+
+
+        private void StartServer ( )
+            {
+            pipeServer = new NamedPipeServerStream ( "UEVRFrontendPipe", PipeDirection.In );
+            pipeServer.BeginWaitForConnection ( OnClientConnected, pipeServer );
+            }
+
+        private void OnClientConnected ( IAsyncResult result )
+            {
+            NamedPipeServerStream server = ( NamedPipeServerStream ) result.AsyncState;
+            server.EndWaitForConnection ( result );
+
+            using ( StreamReader sr = new StreamReader ( server ) )
+                {
+                string receivedData = sr.ReadLine ( );
+                if ( receivedData != null )
+                    {
+                    Dispatcher.Invoke ( ( ) =>
+                    {
+                        HandleReceivedData ( receivedData );
+                    } );
+                    }
+                }
+
+            // Restart listening for new connections
+            StartServer ( );
+            }
+
+        private void HandleReceivedData ( string data )
+            {
+            if ( data.StartsWith ( "http", StringComparison.OrdinalIgnoreCase ) )
+                {
+                // Handle download link
+                MessageBox.Show ( $"Download link received: {data}" );
+                }
+            else
+                {
+                if ( data.EndsWith ( ".zip" ) ) ImportConfig_Impl ( data );
+                }
+            }
 
         public static bool IsAdministrator() {
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            WindowsIdentity identity = WindowsIdentity.GetCurrent ( );
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
@@ -257,6 +341,10 @@ namespace UEVR {
             if ( !m_launchMode) {
                  FillProcessList();
             }
+
+            if ( m_launchMode && m_launchTarget.EndsWith ( ".exe" ) && !m_connected )
+                Launch_Clicked_Impl ( );
+
             m_openvrRadio.IsChecked = m_mainWindowSettings.OpenVRRadio;
             m_openxrRadio.IsChecked = m_mainWindowSettings.OpenXRRadio;
             m_nullifyVRPluginsCheckbox.IsChecked = m_mainWindowSettings.NullifyVRPluginsCheckbox;
@@ -271,78 +359,65 @@ namespace UEVR {
             return Process.GetProcesses().Any(p => p.ProcessName.Equals(executableName, StringComparison.OrdinalIgnoreCase));
         }
 
-        //I don't love this handling but I was starting write myself into a hole. This seems okay. 
+        // Most exclusions will be done through the text file interface. Older cases are moved to a backup folder by the cleanup class which should really only run once ever per person
         private void ExcludeProcess ( string procName )
             {
             CleanupExclusions.Cleanup ( );
-            List<string> excludedProcesses = SyncExclusions ( new List<string> ());
-            // allow for user override in case some games are failing and getting blocked 
-            if ( File.Exists ( "include.txt" ) )
-                {
-                var lines = File.ReadAllLines ( "include.txt" ).ToList ( );
+            // passes an empty list on app startup that will be populated from the file. Any subsequent exclusions can write to the file without having to iterate through it each time
+            List<string> excludedProcesses = SyncExclusions ( new List<string> ( ) );
+            var excludedDir = Path.Combine ( GetGlobalDir ( ), "zExcluded" );
+            var include = Path.Combine ( GetGlobalDir ( ), "Included.txt" );
 
+            // allow for user override in case some games are failing and getting blocked 
+            if ( File.Exists ( include ) )
+                {
+                var lines = File.ReadAllLines ( include ).ToList ( );
                 if ( lines.Contains ( procName ) )
                     {
                     if ( excludedProcesses.Contains ( procName ) )
                         {
                         excludedProcesses.Remove ( procName );
+                        IncludeProc ( procName );
+                        return;
                         }
                     }
                 }
-                if ( !excludedProcesses.Contains ( procName ) ) excludedProcesses.Add ( procName );
-                else
-                    {
-                    if ( procName.EndsWith ( "Win64-Shipping" ) ) excludedProcesses.Remove ( procName );
-                    if ( Directory.Exists ( Path.Combine ( GetGlobalDir ( ), "excluded", procName ) ) ) return;
-                    else if ( Directory.Exists ( Path.Combine ( GetGlobalDir ( ), procName ) ) ) excludedProcesses.Remove ( procName );
-                    if ( Path.GetFileNameWithoutExtension ( m_launchTarget ) == procName ) excludedProcesses.Remove ( procName );
-                    }
+            if ( !excludedProcesses.Contains ( procName ) && !(procName.Contains("win64-shipping" ,StringComparison.OrdinalIgnoreCase ) ) ) excludedProcesses.Add ( procName );
             SyncExclusions ( excludedProcesses );
             }
 
-        ////only logic happening here is duplicate handling
-        //private List<string> SyncExclusions ( )
-        //    {
-        //    List<string> excludedProcesses = new List<string> ( );
-        //    using ( FileStream fs = new FileStream ( "excluded.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read ) )
-        //    using ( StreamReader sr = new StreamReader ( fs ) )
-        //    using ( StreamWriter sw = new StreamWriter ( fs ) )
-        //        {
-        //        fs.Position = 0;
-        //        if ( excludedProcesses.Count == 0 ) {
-        //                foreach ( var line in sr.ReadToEnd ( ).Split ( new string [ ] { "\r\n" }, StringSplitOptions.None ).ToList ( ) )
-        //                    {
-        //                    if ( !excludedProcesses.Contains ( line ) ) excludedProcesses.Add ( line );
-        //                    }     
-        //            }
-        //        else {                  
-        //                sw.Write ( string.Join ( "\r\n", excludedProcesses ) );
-        //            }
-        //        fs.SetLength ( fs.Position );   
-        //            }
-        //    return excludedProcesses;
-        //        }
+        private void IncludeProc(string procName )
+            {
+            var excludedDir = Path.Combine ( GetGlobalDir ( ), "zExcluded" );
+            var excludedProcDir = Path.Combine ( excludedDir, procName );
+            if ( !Directory.Exists ( Path.Combine ( GetGlobalDir ( ), procName ) ) ) Directory.CreateDirectory ( Path.Combine ( GetGlobalDir ( ), procName ) );
+            if ( Directory.Exists ( excludedProcDir ) )
+                GameConfig.MoveDirectoryContents ( excludedProcDir, Path.Combine ( GetGlobalDir ( ) ) );
+            }
 
         private List<string> SyncExclusions ( List<string> excludedProcesses )
             {
-            using ( FileStream fs = new FileStream ( "excluded.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read ) )
-            using ( StreamReader sr = new StreamReader ( fs ) )
-            using ( StreamWriter sw = new StreamWriter ( fs ) )
+            try
                 {
-                fs.Position = 0;
-                if ( excludedProcesses.Count == 0 )
+                using ( FileStream fs = new FileStream ( Path.Combine ( GetGlobalDir ( ), "excluded.txt" ), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read ) )
+                using ( StreamReader sr = new StreamReader ( fs ) )
+                using ( StreamWriter sw = new StreamWriter ( fs ) )
                     {
-                    foreach ( var line in sr.ReadToEnd ( ).Split ( new string [ ] { "\r\n" }, StringSplitOptions.None ).ToList ( ) )
+                    fs.Position = excludedProcesses.Count;
+                    if ( fs.Position == 0 )
                         {
-                        if ( !excludedProcesses.Contains ( line ) ) excludedProcesses.Add ( line );
+                        foreach ( var line in sr.ReadToEnd ( ).Split ( new string [ ] { "\r\n" }, StringSplitOptions.None ).ToList ( ) )
+                            {
+                            if ( !excludedProcesses.Contains ( line ) ) excludedProcesses.Add ( line );
+                            }
                         }
+                    else
+                        {
+                        sw.Write ( string.Join ( "\r\n", excludedProcesses ) );
+                        }
+                    fs.SetLength ( fs.Position );
                     }
-                else
-                    {
-                    sw.Write ( string.Join ( "\r\n", excludedProcesses ) );
-                    }
-                fs.SetLength ( fs.Position );
-                }
+                } catch(Exception) { }
             return excludedProcesses;
             }
 
@@ -492,9 +567,11 @@ namespace UEVR {
                                     SaveCurrentConfig();
                                 }
                             }
-                        } catch (Exception) {
+                            }
+                        catch ( Exception )
+                            {
 
-                        }
+                            }
 
                         Injector.InjectDll(process.Id, "UEVRBackend.dll");
                     }
@@ -539,7 +616,7 @@ namespace UEVR {
                     }
                 }
             if (data != null) {
-
+       
                 //this is a little silly and I've probably made more work for myself by not simply using shmem for both but I think I'm using enough references to the pid it makes sense to have as a member var rather than calling getdata anytime I need it
                 if ( m_launchMode && m_pid == 0 ) m_pid = (int)data?.pid;
                 m_connectionStatus.Text = UEVRConnectionStatus.Connected;
@@ -635,7 +712,7 @@ namespace UEVR {
 
         private void OpenGlobalDir_Clicked(object sender, RoutedEventArgs e) {
             string directory = GetGlobalDirPath();
-
+            if ( m_currentConfig != null ) { directory = Path.GetDirectoryName ( m_currentConfigPath ); }
             if (!System.IO.Directory.Exists(directory)) {
                 System.IO.Directory.CreateDirectory(directory);
             }
@@ -674,16 +751,30 @@ namespace UEVR {
                 string [ ] files = ( string [ ] ) e.Data.GetData ( DataFormats.FileDrop );
                 var file = files [ 0 ];
                 try
-                    {                
-                    File.Copy ( file, Path.Combine ( Path.GetDirectoryName ( m_lastSharedData?.path ),Path.GetFileName(file))  );
+                    {
+                    CopyToGameDir ( files );            
                     }
                 catch ( Exception ) { }
                 }
             }
 
+        private void CopyToGameDir(string[] files )
+            {
+            var gameDir = Path.Combine ( Path.GetDirectoryName ( m_lastSharedData?.path ) );
+            foreach ( var _file in files )
+                {
+                if ( _file.EndsWith ( ".pak" ) )
+                    {
+                    var paksDir = Path.Combine ( gameDir, "..\\", "..\\", "Content", "Paks", "~mods" );
+                    if ( !Directory.Exists ( paksDir ) ) Directory.CreateDirectory ( paksDir );
+                    File.Copy ( _file, Path.Combine ( paksDir, Path.GetFileName ( _file ) ) );
+                    }
+                else if ( _file.EndsWith ( ".dll" ) ) File.Copy ( _file, Path.Combine ( gameDir, Path.GetFileName ( _file ) ) );
+                }
+            }
 
         private void ExportConfig_Clicked(object sender, RoutedEventArgs e) {
-            if (!m_connected) {
+            if (!m_connected && string.IsNullOrEmpty(m_launchTarget))  {
                 MessageBox.Show("Inject into a game first!");
                 return;
             }
@@ -880,6 +971,7 @@ namespace UEVR {
             m_mainWindowSettings.IgnoreFutureVDWarnings = m_ignoreFutureVDWarnings;
             m_mainWindowSettings.FocusGameOnInjection = m_focusGameOnInjectionCheckbox.IsChecked == true;
             m_mainWindowSettings.ExperimentalSettingsCheckbox = m_ExperimentalSettingsCheckbox.IsChecked == true;
+            if ( !m_connected ) CleanLocalRuntime();
             m_mainWindowSettings.Save();
         }
 
@@ -992,13 +1084,20 @@ namespace UEVR {
                     return;
                 }
                 var iniStr = IniToString ( m_currentConfig );
-                if (m_launchMode && !string.IsNullOrEmpty ( m_LaunchModeCmdLine.Text ) )
+                if (m_launchMode && !string.IsNullOrEmpty ( m_LaunchModeArgs ) )
                     {
-                    m_LaunchModeArgs = m_LaunchModeCmdLine.Text;
-                    if (!iniStr.Contains( "Frontend_LauncherCommandLine=" ) )
-                        iniStr += "\nFrontend_LauncherCommandLine=" + m_LaunchModeArgs;
+                    var cmdline = Path.Combine ( GetGlobalGameDir ( Path.GetFileNameWithoutExtension ( m_launchTarget ) ), "LastCommandLine.txt" );
+                    using ( FileStream fs = new FileStream ( cmdline, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read ) )
+                    using ( StreamWriter sw = new StreamWriter ( fs ) )
+                        {
+                        fs.Position = 0;
+                        sw.WriteLine ( m_launchTarget );
+                        sw.WriteLine ( m_LaunchModeArgs );
+                        fs.SetLength ( fs.Position );
+                        }
+                   
                     }
-       
+
                 Debug.Print(iniStr);
 
                 File.WriteAllText(m_currentConfigPath, iniStr);
@@ -1103,16 +1202,17 @@ namespace UEVR {
 
         private void RefreshConfigUI() {
             if (m_currentConfig == null) {
+                m_openConfigDirText.Text = "Open Global Dir";
                 return;
             }
-
+            m_openConfigDirText.Text = "Open Config Dir";
             var vanillaList = m_currentConfig.AsEnumerable().ToList();
             vanillaList.Sort((a, b) => a.Key.CompareTo(b.Key));
 
             List<GameSettingEntry> newList = new List<GameSettingEntry>();
 
             foreach (var kv in vanillaList) {
-                if (!string.IsNullOrEmpty(kv.Key) && !(kv.Key == "Frontend_LauncherCommandLine" ) && !string.IsNullOrEmpty(kv.Value)) {
+                if (!string.IsNullOrEmpty(kv.Key) && !string.IsNullOrEmpty(kv.Value)) {
                     Dictionary<string, string> comboValues = new Dictionary<string, string>();
                     string tooltip = "";
 
@@ -1163,8 +1263,7 @@ namespace UEVR {
 
             foreach (var entry in MandatoryConfig.Entries) {
                 if (m_currentConfig.AsEnumerable().ToList().FindAll(v => v.Key == entry.Key).Count() == 0) {
-                    if ( entry.Key == "Frontend_LauncherCommandLine" ) m_LaunchModeArgs += entry.Value;
-                    else m_currentConfig[entry.Key] = entry.Value;
+                    m_currentConfig[entry.Key] = entry.Value;
                     }
                 }
 
@@ -1174,9 +1273,25 @@ namespace UEVR {
         private void InitializeConfig(string gameName) {
             var configDir = GetGlobalGameDir(gameName);
             var configPath = configDir + "\\config.txt";
-
             InitializeConfig_FromPath(configPath);
-        }
+            if ( m_launchMode )
+                {
+                try
+                    {
+                    string [ ] text;
+                    var cmdline = Path.Combine ( GetGlobalGameDir ( Path.GetFileNameWithoutExtension ( m_launchTarget ) ), "LastCommandLine.txt" );
+                    if (File.Exists(cmdline))
+                        {
+                    text = File.ReadAllLines (cmdline);
+                        if ( File.Exists ( text [ 0 ].ToString ( ) ) && !m_launchTarget.EndsWith(".exe") )  m_launchTarget = text [ 0 ].ToString ( );
+                        m_LaunchModeArgs = text [ 1 ].ToString ( );
+                        m_LaunchModeCmdLine.Text = m_LaunchModeArgs;
+                      }        
+                    }
+                catch ( Exception ) { }
+ 
+                }
+            }
 
         private bool m_isFirstProcessFill = true;
 
@@ -1250,6 +1365,8 @@ namespace UEVR {
                                         ExcludeProcess ( m_lastSelectedProcessName);
                                         break;
                                     case MessageBoxResult.No:
+                                        // Note that we only have to do this in the case of games with weird names that also fail the UE check
+                                        IncludeProc ( m_lastSelectedProcessName );
                                         break;
                                     };
                                 
@@ -1397,14 +1514,24 @@ namespace UEVR {
 
         private void AppPicker_Clicked(object sender, RoutedEventArgs e )
             {
-            //shouldnt ever happen
-            if ( m_connected ) return;
+            if(m_connected)
+                {
+                var result = MessageBox.Show ( "Terminate active game before changing selection?", "Confirmation", MessageBoxButton.YesNo );
+                switch ( result )
+                    {
+                    case MessageBoxResult.Yes:
+                        TerminateConnected ( 1 );
+                        break;
+                    case MessageBoxResult.No:
+                        return;
+                    };
+                }
             m_launchTarget = AppPicker_FileDialog ( "Select an Unreal Engine game to launch", "" );
             if (!AppPicker_VerifySelection ( ))
                 {
                 m_launchTarget = "";
-                MessageBox.Show ( "Not a valid selection" );
-                return;
+                MessageBox.Show ( "Selection may be invalid" );
+                
                 }
             ProcessSelected ( m_launchTarget );
             m_LaunchTargetView.Visibility = Visibility.Visible;
@@ -1436,6 +1563,7 @@ namespace UEVR {
         private bool AppPicker_VerifySelection ( )
             {
             if ( string.IsNullOrEmpty ( m_launchTarget ) ) return false;
+            if ( Directory.Exists ( Path.Combine ( GetGlobalDir ( ), Path.GetFileNameWithoutExtension ( m_launchTarget ) ))) return true;
             if ( m_launchTarget.ToLower ( ).EndsWith ( "win64-shipping.exe" ) ) return true;
                 var targetDir = Path.GetFullPath ( Path.GetDirectoryName ( m_launchTarget ) );
                 if ( Directory.Exists ( Path.Combine ( targetDir, "Engine" ) ) )
@@ -1507,6 +1635,7 @@ namespace UEVR {
                 //var engineDir = Path.Combine ( m_launchTarget, "..", "..", "..", "Engine" );
                 var openxr = Path.Combine ( Path.GetDirectoryName ( m_launchTarget ), "openxr_loader.dll" );
                 var openvr = Path.Combine ( Path.GetDirectoryName ( m_launchTarget ), "openvr_api.dll" );
+                var backend = Path.Combine ( Path.GetDirectoryName ( m_launchTarget ), "UEVRBackend.dll" );
                 if ( File.Exists ( openxr ) ) File.Delete ( openxr );
                 if ( File.Exists ( openvr ) ) File.Delete ( openvr );
                 }
@@ -1519,15 +1648,17 @@ namespace UEVR {
             Launch_Clicked_Impl ( );
             }
 
-        private void Launch_Clicked_Impl (  )
-            {
-            TimeSpan thirtySeconds = TimeSpan.FromSeconds ( 30 );
-            var now = DateTime.Now;
 
+
+
+        private void TerminateConnected ( int dur)
+            {
             if ( m_pid != 0 )
                 {
+                TimeSpan _seconds = TimeSpan.FromSeconds ( dur );
+                var now = DateTime.Now;
                 //ignore early misclicks to terminate 
-                if ( DateTime.Now - m_lastAutoInjectTime > thirtySeconds )
+                if ( DateTime.Now - m_lastAutoInjectTime > _seconds )
                     {
                     Process target = Process.GetProcessById ( m_pid );
                     if ( target == null || target.HasExited )
@@ -1549,6 +1680,12 @@ namespace UEVR {
                     }
                 return;
                 }
+            }
+
+        private void Launch_Clicked_Impl (  )
+            {
+            if (! IsValidPath ( m_launchTarget ) ) return;
+            if(m_connected ) TerminateConnected (30 );
 
             Process? process = null;
             string runtimeName;
@@ -1567,29 +1704,53 @@ namespace UEVR {
                 runtimeName = "openxr_loader.dll";
                 }
             var creationFlag = m_startSuspended ? 4u : 0u;
-
+            var wdir = Path.GetDirectoryName ( m_launchTarget );
             var cd = Directory.GetCurrentDirectory ( );
+            try{
             DirectoryInfo dInfo = new DirectoryInfo ( m_launchTarget );
-            var wdir = dInfo.Parent.FullName;
+            wdir = dInfo.Parent.FullName;
             var sid = new SecurityIdentifier ( "S-1-15-2-1" );
             var access = new DirectorySecurity ( );
             access.AddAccessRule ( new FileSystemAccessRule ( identity: WindowsIdentity.GetCurrent ( ).User, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow ) );
             dInfo.SetAccessControl ( access );
+} catch (Exception) { }
+
+
+
             Injector.PROCESS_INFORMATION pi;
             Injector.STARTUPINFO si = new Injector.STARTUPINFO ( );
            
             //having openxr_loader in the game dir can cause failure to launch sometimes so we clean up beforehand 
             var localRuntime = Path.Combine ( wdir, runtimeName );
             if ( File.Exists ( localRuntime ) ) File.Delete ( localRuntime );
-            //we already specify launching the proc from game dir but this may help a bit with some cases like injecting across drives. realistically could likely be removed but needs further tests
-            Directory.SetCurrentDirectory ( wdir );
-            var backendSrc = m_ExperimentalSettingsCheckbox.IsChecked == true ? Path.Combine ( GetGlobalDir ( ), "uevr-nightly" ) : Path.GetDirectoryName ( Process.GetCurrentProcess ( ).MainModule.FileName );
-            //TODO replace with tool snapshot method
-            var dllPaths = new List<string> ( ) { Path.Combine ( backendSrc, "UEVRBackend.dll" ), Path.Combine ( backendSrc, runtimeName ) };
 
-            foreach(var p in Process.GetProcessesByName ( Path.GetFileName ( m_launchTarget ) ) )
+            //Sometimes this is necessary for games with custom launchers. Not entirely sure why but just what I've observed from checking their command lines. We'll do this without updating the commandline text to avoid clutter
+            if ( !(m_LaunchModeCmdLine.Text.Split(" " ) [0].EndsWith(".exe") || m_LaunchModeCmdLine.Text.Split ( " " ) [ 0 ].EndsWith ( ".exe\"" ) ))
+                m_LaunchModeArgs = m_launchTarget + " " + m_LaunchModeCmdLine.Text;
+            //   var backendSrc = m_ExperimentalSettingsCheckbox.IsChecked == true ? Path.Combine ( GetGlobalDir ( ), "uevr-nightly" ) : Path.GetDirectoryName ( Process.GetCurrentProcess ( ).MainModule.FileName );
+            //TODO replace with tool snapshot method
+            var nightlyDir = Path.Combine ( GetGlobalDir ( ), "uevr-nightly" );
+            var backend ="UEVRBackend.dll";
+            var reldir = Path.Combine ( GetGlobalDir ( ), "uevr" );
+            var nightlyDll = Path.Combine ( nightlyDir, backend );
+            var relDll = Path.Combine ( reldir, backend );
+            if ( File.Exists (nightlyDll  ) ) 
                 {
-                if ( !Injector.InjectDll ( p.Id, dllPaths [0] ) ) p.Kill ( );
+                if (File.GetCreationTime(nightlyDll) > File.GetCreationTime(relDll))
+                    Directory.SetCurrentDirectory ( nightlyDir );
+                }
+            else  Directory.SetCurrentDirectory ( reldir );
+            
+          //  var backendPath = Path.Combine ( backendSrc, "UEVRBackend.dll" );
+         //   var runtimePath = Path.Combine ( m, runtimeName );
+           foreach(var p in Process.GetProcessesByName ( Path.GetFileName ( m_launchTarget ) )   )
+                {
+                if ( p.HasExited ) continue;
+                if ( !p.Responding ) p.Kill ( );
+                if ( !Injector.InjectDll ( p.Id, backend) )
+                    {
+                        p.Kill ( ); 
+                    }
                 else
                     {
                     m_pid = p.Id;
@@ -1597,14 +1758,20 @@ namespace UEVR {
                     }
                 }
             if ( m_pid != 0 ) goto SUCCESS;
+            
+           
+
             if ( !Injector.CreateProcess ( m_launchTarget, m_LaunchModeArgs, IntPtr.Zero, IntPtr.Zero, true, creationFlag, IntPtr.Zero, wdir, ref si, out pi ) )
                 {
                 MessageBox.Show ( "Failed to launch process" );
                 return;
                 }
+            if(m_mountToGame ){ 
+                Directory.SetCurrentDirectory ( wdir );
+                File.CreateSymbolicLink ( Path.Combine(wdir,backend), Path.Combine ( nightlyDir, backend ));
+                }
 
-
-            if ( !Injector.InjectDlls ( pi.hProcess, dllPaths))
+            if ( !Injector.InjectDll ( pi.dwProcessId, backend ))
                 {
                 MessageBox.Show ( "Failed to inject backend into process" );
                 if ( m_startSuspended )
@@ -1612,11 +1779,13 @@ namespace UEVR {
                 return;
                 }
              m_pid = pi.dwProcessId;
-            if ( m_startSuspended ) Injector.ResumeThread ( pi.hThread );
-    SUCCESS:
-            //    //generally runtime in gamedir is more effective but if we can't write to there we can try injecting from uevr folder 
-            File.Copy ( Path.Combine ( AppContext.BaseDirectory, runtimeName ), localRuntime );           
-            m_lastAutoInjectTime = now;
+            var resumecode = -1;
+            if ( m_startSuspended && !m_waitForDebugger ) Injector.ResumeThread ( pi.hThread );
+
+SUCCESS:
+            //if (!Injector.InjectDll ( m_pid, runtimeName));
+         File.Copy(Path.Combine ( AppContext.BaseDirectory, runtimeName ) ,localRuntime );
+            m_lastAutoInjectTime = DateTime.Now;
             m_processList.Add ( Process.GetProcessById ( m_pid ) );
             InitializeConfig ( Path.GetFileNameWithoutExtension ( m_launchTarget ) );
             try
@@ -1627,7 +1796,6 @@ namespace UEVR {
                         {
                         m_currentConfig [ "Frontend_RequestedRuntime" ] = runtimeName;
                         RefreshConfigUI ( );
-                        SaveCurrentConfig ( );
                         }
                     }
                 }
@@ -1640,48 +1808,14 @@ namespace UEVR {
             if ( m_focusGameOnInjectionCheckbox.IsChecked == true )
                 {
                 SwitchToThisWindow ( Process.GetProcessById ( m_pid ).MainWindowHandle, true );
+                m_LaunchModeArgs = m_launchTarget + "\n" + m_LaunchModeCmdLine.Text;
+                SaveCurrentConfig ( );
                 }
             }
 
 
-        //private async Task HijackGame ( )
-        //    {
-        //    while ( !IsGameRunning ( ) )
-        //        {
-        //        await Task.Delay ( 10 );
-        //        }
-
-        //    if ( IsGameRunning ( ) )
-        //        {
-        //        var delay = conf.InjectDelay;
-        //        await Task.Delay ( ( int ) delay );
-        //        Process.GetProcesses ( )
-        //            .Where ( x => x.ProcessName == Path.GetFileNameWithoutExtension ( conf.LoadTarget ) )
-        //            .ToList ( )
-        //            .ForEach ( x => ProcessUtils.InjectDlls ( x.Id, conf.DllPaths ) );
-        //        }
-        //    }
 
 
-        private async Task HandleInjection ( PROCESS_INFORMATION pi, DateTime creationTime, int delay, List<string> dllPaths )
-            {
-            var backendSrc = m_ExperimentalSettingsCheckbox.IsChecked == true ? Path.Combine ( GetGlobalDir ( ), "uevr-nightly" ) : Path.GetDirectoryName ( Process.GetCurrentProcess ( ).MainModule.FileName );
-            await Task.Delay ( delay * 500 );
-            if ( !Injector.InjectDlls ( pi.hProcess, dllPaths) )
-                Console.WriteLine ( "Failed to inject" );
-            int tries = 0;
-            bool result = false;
-            do
-                {
-                if ( !Injector.InjectDlls ( pi.hProcess, dllPaths                                                   ) ) 
-                    {
-                    tries++;
-                    result = false;
-                    Console.WriteLine ( "Failed to inject" );
-                    }
-                else result = true;
-                } while ( !result && tries < 10 );
-            }
 
         private void Inject_Clicked ( object sender, RoutedEventArgs e ) {
                 // "Terminate Connected Process"
@@ -1977,6 +2111,17 @@ namespace UEVR {
             } finally {
                 m_processSemaphore.Release();
             }
-        }       
+        }
+
+        private bool IsValidPath(string path) {
+            if ( string.IsNullOrEmpty ( path ) ) return false;
+            return File.Exists ( path );
+
+            }
+
+        private void LaunchModeCmdLine_KeyDown ( object sender, KeyEventArgs e )
+            {
+            if ( e.Key is Key.Enter ) Launch_Clicked_Impl ( );
+            }
         }
 }

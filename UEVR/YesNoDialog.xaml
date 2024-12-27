@@ -1,46 +1,65 @@
-<Window x:Class="UEVR.YesNoDialog"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:UEVR"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        TextElement.FontWeight="Regular"
-        TextElement.FontSize="13"
-        TextOptions.TextFormattingMode="Ideal"
-        TextOptions.TextRenderingMode="Auto"
-        FontFamily="{DynamicResource MaterialDesignFont}"
-        Background="#FF1A1B1C"
-        SizeToContent="WidthAndHeight" ResizeMode="NoResize" Icon="/UEVR2.png"
-        WindowStartupLocation="CenterScreen"
-        WindowStyle="None"
-        Title="Prompt" Height="200" Width="400">
+<Window
+    x:Class="UEVR.YesNoDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:UEVR"
+    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="Prompt"
+    Width="400"
+    Height="200"
+    Background="#FF1A1B1C"
+    FontFamily="{DynamicResource MaterialDesignFont}"
+    Icon="/UEVR2.png"
+    ResizeMode="NoResize"
+    SizeToContent="WidthAndHeight"
+    TextElement.FontSize="13"
+    TextElement.FontWeight="Regular"
+    TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+    TextOptions.TextFormattingMode="Ideal"
+    TextOptions.TextRenderingMode="Auto"
+    WindowStartupLocation="CenterScreen"
+    WindowStyle="None">
     <Border BorderBrush="#FF3D3D40" BorderThickness="2">
         <StackPanel>
-            <Border MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#FF1A1B1C">
+            <Border Background="#FF1A1B1C" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Border.Style>
                     <Style TargetType="{x:Type Border}">
-                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Cursor" Value="Hand" />
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Cursor" Value="SizeAll"/>
+                                <Setter Property="Cursor" Value="SizeAll" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
                 <DockPanel Height="30">
-                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}"
-                       VerticalAlignment="Center"
-                       Margin="25,0,0,0"
-                       FontWeight="Bold"
-                       Foreground="White" />
+                    <TextBlock
+                        Margin="25,0,0,0"
+                        VerticalAlignment="Center"
+                        FontWeight="Bold"
+                        Foreground="White"
+                        Text="{Binding Title, RelativeSource={RelativeSource FindAncestor, AncestorType=Window}}" />
                 </DockPanel>
             </Border>
             <TextBlock x:Name="m_dialogText" Margin="10" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
-                <Button x:Name="btnYes" Content="Yes" Width="75" Margin="5" Click="btnYes_Click" />
-                <Button x:Name="btnNo" Content="No" Width="75" Margin="5" Click="btnNo_Click" />
+            <StackPanel
+                Margin="10"
+                HorizontalAlignment="Right"
+                Orientation="Horizontal">
+                <Button
+                    x:Name="btnYes"
+                    Width="75"
+                    Margin="5"
+                    Click="btnYes_Click"
+                    Content="Yes" />
+                <Button
+                    x:Name="btnNo"
+                    Width="75"
+                    Margin="5"
+                    Click="btnNo_Click"
+                    Content="No" />
             </StackPanel>
         </StackPanel>
     </Border>

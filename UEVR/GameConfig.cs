@@ -121,7 +121,8 @@ namespace UEVR {
             }
         }
 
-        private static void MoveDirectoryContents(string sourceDir, string destinationDir) {
+        //Make public to call from exclusion handling methods
+        public static void MoveDirectoryContents(string sourceDir, string destinationDir) {
             foreach (var dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories)) {
                 Directory.CreateDirectory(dirPath.Replace(sourceDir, destinationDir));
             }   
@@ -130,7 +131,6 @@ namespace UEVR {
                 File.Copy(newPath, newPath.Replace(sourceDir, destinationDir), true);
             }
         }
-
         public static string? BrowseForImport(string? initialDirectory = null) {
             var openFileDialog = new OpenFileDialog {
                 DefaultExt = ".zip",

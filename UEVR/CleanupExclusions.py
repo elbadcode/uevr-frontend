@@ -1,6 +1,9 @@
 from os import scandir, rename, remove, chdir, makedirs, getcwd,environ
 from os.path import isfile, isdir, join
 
+#  doesn't need to ship with app only wrote this to give to people not using the fork
+
+
 knownfiles = [
     "bindings_vive_controller.json",
     "cameras.txt",
